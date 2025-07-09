@@ -1,0 +1,43 @@
+# Discord Bot  
+# 使用前请复制为 "config.toml" 并填入信息。
+
+# [核心配置]
+token = "MTM4OTAxNjgyNzQ4NDU3MzgwOA.GALlNn.V-KPnum5rWOezUXj4X3i34NJiRAxX-5Hd7btNw"
+time_offset = 7200
+# [安全与权限]
+
+guild_ids = [
+    1376876143059144714,
+]
+# 拥有特殊权限并免疫速率限制的用户ID列表。
+extra_admins_ids = [
+    801430773600485407,239838081316945921
+]
+admin_role_ids = [
+
+]
+
+# [功能配置]
+
+# 用户可创建的自定义协议上限
+max_user_licenses = 5
+# 用户未设置时，自动发布功能使用的默认系统授权名。
+# 必须是 "config/system_licenses.json" 中定义的有效 "name"。
+# 推荐值: "cc_by_nc_sa_4.0", "cc_by_nc_nd_4.0", "personal_use_only", "cc_by_nc_4.0"
+default_system_license = "cc_by_nc_4.0"
+
+# [与备份机器人同步]
+
+# 是否启用与备份Bot的同步功能
+backup_enabled = false
+# 备份Bot的接收端点 URL
+endpoint = "http://127.0.0.1:8199"
+
+# [速率限制]
+# 各命令的冷却时间（秒）。管理员不受影响。
+
+
+command_license = 10        # /授权
+command_create_license = 10  # /创建协议
+command_manage_license = 5   # /协议管理 (包括编辑、删除等操作)
+command_settings = 5        # /设置

@@ -3,6 +3,12 @@ use snafu::{Location, Snafu};
 #[derive(Snafu, Debug)]
 pub enum BotError {
     #[snafu(transparent)]
+    ParseIntError {
+        #[snafu(implicit)]
+        loc: Location,
+        source: std::num::ParseIntError,
+    },
+    #[snafu(transparent)]
     JemallocCtlError {
         #[snafu(implicit)]
         loc: Location,

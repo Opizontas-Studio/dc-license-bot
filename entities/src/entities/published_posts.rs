@@ -3,14 +3,14 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "messages")]
+#[sea_orm(table_name = "published_posts")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
+    pub thread_id: i64,
     pub message_id: i64,
     pub user_id: i64,
-    pub guild_id: i64,
-    pub channel_id: i64,
-    pub timestamp: DateTimeWithTimeZone,
+    pub backup_allowed: bool,
+    pub updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

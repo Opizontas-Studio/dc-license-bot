@@ -1,0 +1,30 @@
+[
+  {
+    "license_name": "CC BY-NC-SA 4.0 (署名-非商业性使用-相同协议共享)",
+    "allow_redistribution": true,
+    "allow_modification": true,
+    "allow_backup": false,
+    "restrictions_note": "必须署名原作者，禁止商业使用，修改后的作品必须以相同协议发布"
+  },
+  {
+    "license_name": "CC BY-NC-ND 4.0 (署名-非商业性使用-禁止演绎)",
+    "allow_redistribution": true,
+    "allow_modification": false,
+    "allow_backup": false,
+    "restrictions_note": "必须署名原作者，禁止商业使用，禁止修改作品"
+  },
+  {
+    "license_name": "仅限个人使用",
+    "allow_redistribution": false,
+    "allow_modification": false,
+    "allow_backup": false,
+    "restrictions_note": "仅供个人学习、研究或欣赏使用，禁止任何形式的传播、修改或商业用途"
+  },
+  {
+    "license_name": "CC BY-NC 4.0 (署名-非商业性使用)",
+    "allow_redistribution": true,
+    "allow_modification": true,
+    "allow_backup": false,
+    "restrictions_note": "必须署名原作者，禁止商业使用"
+  }
+]

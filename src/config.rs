@@ -8,7 +8,7 @@ use std::{
 use arc_swap::ArcSwap;
 use figment::{
     Figment,
-    providers::{Env, Format, Json},
+    providers::{Env, Format, Toml},
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -22,20 +22,13 @@ use snafu::{OptionExt, ResultExt};
 use crate::error::BotError;
 
 #[serde_as]
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BotCfg {
     pub time_offset: i32,
     pub token: String,
-    pub supervisor_guilds: Vec<GuildId>,
-    pub admin_role_ids: Vec<RoleId>,
-    pub extra_admin_user_ids: Vec<UserId>,
-    pub cookie_endpoint: Option<Url>,
-    pub cookie_secret: String,
-    #[serde_as(as = "Vec<(_, DurationSeconds)>")]
-    pub tree_holes: HashMap<ChannelId, Duration>,
-    pub toilets: HashSet<ChannelId>,
-    pub extra_owners: HashSet<UserId>,
+    pub admin_role_ids: HashSet<RoleId>,
+    pub endpoint: Url,
+    pub extra_admins_ids: HashSet<UserId>,
     #[serde(skip)]
     pub path: PathBuf,
 }
@@ -64,7 +57,7 @@ impl BotCfg {
         Ok(Self {
             path: path.as_ref().to_owned(),
             ..Figment::new()
-                .merge(Json::file(path))
+                .merge(Toml::file(path))
                 .merge(Env::prefixed("DOG_BOT_"))
                 .extract_lossy()
                 .whatever_context::<&str, BotError>("Failed to read bot configuration")?

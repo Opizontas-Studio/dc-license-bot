@@ -50,7 +50,10 @@ async fn main() -> Result<(), BotError> {
     let mut client = Client::builder(cfg.load().token.to_owned(), intents)
         .cache_settings({
             let mut s = serenity::cache::Settings::default();
-            s.max_messages = 1000; // Set the maximum number of messages to cache
+            s.max_messages = 0; // Set the maximum number of messages to cache
+            s.cache_channels = false; // Disable channel caching
+            s.cache_guilds = false; // Disable guild caching
+            s.cache_users = false; // Disable user caching
             s
         })
         .type_map_insert::<BotDatabase>(db.to_owned())

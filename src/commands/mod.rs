@@ -1,10 +1,11 @@
-mod cookie;
+// mod cookie;
+mod license;
 mod system;
-
+use license::*;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
-use cookie::*;
+// use cookie::*;
 use owo_colors::OwoColorize;
 use poise::command;
 use snafu::OptionExt;
@@ -17,13 +18,7 @@ pub type Context<'a> = poise::Context<'a, Data, BotError>;
 
 pub async fn check_admin(ctx: Context<'_>) -> Result<bool, BotError> {
     let user_id = ctx.author().id;
-    if ctx
-        .data()
-        .cfg
-        .load()
-        .extra_admin_user_ids
-        .contains(&user_id)
-    {
+    if ctx.data().cfg.load().extra_admins_ids.contains(&user_id) {
         return Ok(true);
     }
     Ok(ctx
@@ -66,23 +61,17 @@ async fn register(ctx: Context<'_>) -> Result<(), BotError> {
 fn option(cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
     poise::FrameworkOptions {
         commands: vec![
-            guilds_info(),
+            auto_publish_settings(),
+            create_license(),
             register(),
             system_info(),
-            submit_cookie(),
+            license_manager(),
         ],
         on_error: |error| {
             Box::pin(async {
                 on_error(error).await;
             })
         },
-        owners: cfg
-            .load()
-            .extra_owners
-            .iter()
-            .map(|id| id.to_owned())
-            .collect(),
-        skip_checks_for_owners: true,
         pre_command: |ctx| {
             Box::pin(async move {
                 info!(

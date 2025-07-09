@@ -19,7 +19,7 @@ arc-swap = "1"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 const_format = { version = "0.2", features = ["rust_1_83"] }
-figment = { version = "0.10", features = ["env", "json"] }
+figment = { version = "0.10", features = ["env", "toml"] }
 futures = "0.3"
 itertools = "0.14"
 owo-colors = "4"
