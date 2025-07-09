@@ -1,10 +1,10 @@
 use chrono::Utc;
 use entities::user_licenses::*;
-use sea_orm::{prelude::*, QueryOrder, QuerySelect, Set};
+use sea_orm::{QueryOrder, QuerySelect, Set, prelude::*};
 use serenity::all::*;
 
-use crate::{database::BotDatabase, error::BotError};
 use super::types::UserLicense;
+use crate::{database::BotDatabase, error::BotError};
 
 pub struct LicenseService<'a>(&'a BotDatabase);
 
@@ -201,6 +201,4 @@ impl LicenseService<'_> {
 
         Ok(result.rows_affected)
     }
-
-
 }

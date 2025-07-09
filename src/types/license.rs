@@ -1,10 +1,11 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+use serenity::all::*;
 
 use crate::error::BotError;
 use entities::user_licenses::Model as LicenseModel;
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct License {
+pub struct SystemLicense {
     pub license_name: String,
     pub allow_redistribution: bool,
     pub allow_modification: bool,
@@ -12,9 +13,9 @@ pub struct License {
     pub allow_backup: bool,
 }
 
-impl From<LicenseModel> for License {
+impl From<LicenseModel> for SystemLicense {
     fn from(model: LicenseModel) -> Self {
-        License {
+        SystemLicense {
             license_name: model.license_name,
             allow_redistribution: model.allow_redistribution,
             allow_modification: model.allow_modification,
@@ -24,10 +25,24 @@ impl From<LicenseModel> for License {
     }
 }
 
-impl License {
-    pub fn read_system_licenses() -> Result<Vec<License>, BotError> {
+impl SystemLicense {
+    pub fn read_system_licenses() -> Result<Vec<SystemLicense>, BotError> {
         let path = crate::Args::parse().default_licenses;
         let string = std::fs::read_to_string(path)?;
         Ok(serenity::json::from_str(&string)?)
+    }
+
+    pub fn to_user_license(&self, user_id: UserId, index: i32) -> LicenseModel {
+        LicenseModel {
+            id: index,
+            user_id: user_id.get() as i64,
+            license_name: self.license_name.clone(),
+            allow_redistribution: self.allow_redistribution,
+            allow_modification: self.allow_modification,
+            restrictions_note: self.restrictions_note.clone(),
+            allow_backup: self.allow_backup,
+            usage_count: 0,
+            created_at: chrono::Utc::now(),
+        }
     }
 }

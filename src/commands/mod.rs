@@ -66,6 +66,7 @@ fn option(cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
             register(),
             system_info(),
             license_manager(),
+            publish_license(),
         ],
         on_error: |error| {
             Box::pin(async {

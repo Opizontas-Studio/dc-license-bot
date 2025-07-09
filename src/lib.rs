@@ -20,6 +20,6 @@ pub struct Args {
     #[clap(short, long, default_value = "./data/bot.db")]
     pub db: PathBuf,
     /// Path to the default licenses file
-    #[clap(short, long, default_value = "./system_licenses.json")]
+    #[clap(short = 'l', long, default_value = "./system_licenses.json")]
     pub default_licenses: PathBuf,
 }

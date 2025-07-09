@@ -11,6 +11,7 @@ use crate::error::BotError;
 
 #[command(
     slash_command,
+    owners_only,
     global_cooldown = 10,
     name_localized("zh-CN", "系统信息"),
     description_localized("zh-CN", "获取系统信息，包括系统名称、内核版本和操作系统版本"),
