@@ -76,6 +76,17 @@ pub async fn create_license(
     };
     match itx.data.custom_id.as_str() {
         "save_license" => {
+            // 检查用户协议数量是否超过上限
+            let current_count = ctx.data().db.license().get_user_license_count(ctx.author().id).await?;
+            if current_count >= 5 {
+                itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
+                    .await?;
+                reply
+                    .edit(ctx, CreateReply::default().content("您最多只能创建5个协议"))
+                    .await?;
+                return Ok(());
+            }
+
             ctx.data()
                 .db
                 .license()
