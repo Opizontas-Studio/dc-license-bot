@@ -7,6 +7,7 @@ use crate::{
     commands::Data,
     error::BotError,
     types::license::DefaultLicenseIdentifier,
+    services::license::LicensePublishService,
 };
 
 pub async fn handle_thread_create(
@@ -80,8 +81,22 @@ pub async fn handle_thread_create(
 
     match interaction.data.custom_id.as_str() {
         "confirm_auto_publish" => {
-            // 确认发布 - 调用现有的发布逻辑
-            publish_license_to_thread(ctx, thread, &license_model, owner_id, data).await?;
+            // 确认发布 - 使用统一的发布服务
+            let display_name = ctx.cache
+                .member(thread.guild_id, owner_id)
+                .map(|m| m.display_name().to_string())
+                .unwrap_or_else(|| format!("<@{}>", owner_id.get()));
+            
+            LicensePublishService::publish(
+                &ctx.http,
+                data,
+                thread,
+                &license_model,
+                license_model.allow_backup, // 自动发布使用协议本身的备份设置
+                owner_id,
+                &format!("User_{}", owner_id.get()), // 简化的用户名，因为我们有display_name
+                &display_name,
+            ).await?;
             
             // 删除交互面板
             let _ = sent_message.delete(&ctx.http).await;
@@ -130,37 +145,3 @@ async fn create_license_preview_embed(
         .colour(Colour::GOLD))
 }
 
-async fn publish_license_to_thread(
-    ctx: &Context,
-    thread: &GuildChannel,
-    license: &entities::user_licenses::Model,
-    owner_id: UserId,
-    data: &Data,
-) -> Result<(), BotError> {
-    // 构建正式的协议发布embed
-    let embed = CreateEmbed::new()
-        .title(format!("📜 授权协议: {}", license.license_name))
-        .description("本帖子内容受以下授权协议保护：")
-        .field("允许二次传播", 
-               if license.allow_redistribution { "✅ 允许" } else { "❌ 不允许" }, true)
-        .field("允许二次修改", 
-               if license.allow_modification { "✅ 允许" } else { "❌ 不允许" }, true)
-        .field("允许备份", 
-               if license.allow_backup { "✅ 允许" } else { "❌ 不允许" }, true)
-        .field("限制条件", 
-               license.restrictions_note.as_deref().unwrap_or("无特殊限制"), false)
-        .footer(CreateEmbedFooter::new(format!("发布者: <@{}>", owner_id.get())))
-        .timestamp(Timestamp::now())
-        .colour(Colour::BLUE);
-
-    // 发送协议到线程
-    let message = CreateMessage::new().embed(embed);
-    ChannelId::new(thread.id.get())
-        .send_message(&ctx.http, message)
-        .await?;
-
-    // 增加协议使用计数
-    data.db().license().increment_usage(license.id, owner_id).await?;
-
-    Ok(())
-}

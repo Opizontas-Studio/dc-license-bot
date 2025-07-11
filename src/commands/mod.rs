@@ -46,6 +46,10 @@ impl Data {
     pub fn system_license_cache(&self) -> &Arc<SystemLicenseCache> {
         &self.system_license_cache
     }
+    
+    pub fn notification_service(&self) -> &Arc<NotificationService> {
+        &self.notification_service
+    }
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, BotError>) {
