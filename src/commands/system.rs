@@ -6,7 +6,7 @@ use serenity::all::{
 };
 use sysinfo::System;
 
-use super::Context;
+use super::{Context, check_admin};
 use crate::error::BotError;
 
 #[command(
@@ -143,5 +143,29 @@ pub async fn guilds_info(ctx: Context<'_>) -> Result<(), BotError> {
         ),
     )
     .await?;
+    Ok(())
+}
+
+#[command(
+    slash_command,
+    check = "check_admin",
+    ephemeral,
+    name_localized("zh-CN", "重载系统授权"),
+    description_localized("zh-CN", "从配置文件重新加载系统授权协议")
+)]
+/// Reload system licenses from the configuration file
+pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
+    let system_license_cache = ctx.data().system_license_cache();
+    
+    match system_license_cache.reload().await {
+        Ok(()) => {
+            ctx.say("✅ 系统授权已成功从文件刷新。").await?;
+        }
+        Err(error) => {
+            ctx.say(format!("❌ 重载失败，请检查日志。错误信息: {}", error))
+                .await?;
+        }
+    }
+    
     Ok(())
 }

@@ -1,10 +1,12 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::sync::RwLock;
 
 use crate::{error::BotError, types::license::SystemLicense};
+
 #[derive(Debug)]
 pub struct SystemLicenseCache {
     licenses: RwLock<Vec<SystemLicense>>,
+    path: PathBuf,
 }
 
 impl SystemLicenseCache {
@@ -14,6 +16,7 @@ impl SystemLicenseCache {
         
         Ok(Self {
             licenses: RwLock::new(licenses),
+            path: path.to_path_buf(),
         })
     }
     
@@ -26,5 +29,15 @@ impl SystemLicenseCache {
             .iter()
             .find(|l| l.license_name == name)
             .cloned()
+    }
+    
+    pub async fn reload(&self) -> Result<(), BotError> {
+        let content = tokio::fs::read_to_string(&self.path).await?;
+        let new_licenses: Vec<SystemLicense> = serde_json::from_str(&content)?;
+        
+        let mut licenses = self.licenses.write().await;
+        *licenses = new_licenses;
+        
+        Ok(())
     }
 }
