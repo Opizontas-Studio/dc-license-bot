@@ -33,11 +33,12 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(big_unsigned_uniq(UserSettings::UserId).primary_key())
                     .col(boolean(UserSettings::AutoPublishEnabled).default(false))
-                    .col(integer_null(UserSettings::DefaultLicenseId))
+                    .col(integer_null(UserSettings::DefaultUserLicenseId))
+                    .col(string_null(UserSettings::DefaultSystemLicenseName))
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_user_settings_default_license")
-                            .from(UserSettings::Table, UserSettings::DefaultLicenseId)
+                            .name("fk_user_settings_default_user_license")
+                            .from(UserSettings::Table, UserSettings::DefaultUserLicenseId)
                             .to(UserLicenses::Table, UserLicenses::Id)
                             .on_delete(ForeignKeyAction::SetNull)
                     )
@@ -95,7 +96,8 @@ enum UserSettings {
     Table,
     UserId,
     AutoPublishEnabled,
-    DefaultLicenseId,
+    DefaultUserLicenseId,
+    DefaultSystemLicenseName,
 }
 
 #[derive(DeriveIden)]
