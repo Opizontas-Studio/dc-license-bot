@@ -18,7 +18,7 @@ pub async fn publish_license(
     #[name_localized("zh-CN", "协议")]
     #[description_localized("zh-CN", "选择要发布的协议")]
     #[autocomplete = "autocomplete_license"]
-    license_id: i32,
+    license_id: String,
 
     #[name_localized("zh-CN", "备份权限")]
     #[description_localized("zh-CN", "覆盖协议中的备份权限设置（可选）")]
@@ -62,28 +62,12 @@ pub async fn publish_license(
     }
 
     // 2. 获取选择的协议
-    let license = if license_id < 0 {
-        // 负数ID表示系统协议
-        let system_licenses = SystemLicense::read_system_licenses().unwrap_or_default();
-        let index = (-license_id - 1) as usize;
-        
-        if index >= system_licenses.len() {
-            ctx.send(
-                CreateReply::default()
-                    .content("未找到该协议。")
-                    .ephemeral(true),
-            )
-            .await?;
-            return Ok(());
-        }
-        
-        // 将系统协议转换为数据库模型格式
-        system_licenses[index].to_user_license(ctx.author().id, license_id)
-    } else {
-        // 正数ID表示用户协议，从数据库获取
+    let license = if let Some(user_id_str) = license_id.strip_prefix("user:") {
+        // 用户协议
+        let user_id = user_id_str.parse::<i32>().map_err(|_| BotError::InvalidInput("无效的协议ID".to_string()))?;
         let Some(license) = db
             .license()
-            .get_license(license_id, ctx.author().id)
+            .get_license(user_id, ctx.author().id)
             .await?
         else {
             ctx.send(
@@ -95,6 +79,30 @@ pub async fn publish_license(
             return Ok(());
         };
         license
+    } else if let Some(system_name) = license_id.strip_prefix("system:") {
+        // 系统协议
+        let system_licenses = SystemLicense::read_system_licenses().unwrap_or_default();
+        let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) else {
+            ctx.send(
+                CreateReply::default()
+                    .content("未找到该系统协议。")
+                    .ephemeral(true),
+            )
+            .await?;
+            return Ok(());
+        };
+        
+        // 将系统协议转换为数据库模型格式
+        // 使用一个虚拟的ID，因为这是系统协议
+        system_license.to_user_license(ctx.author().id, -1)
+    } else {
+        ctx.send(
+            CreateReply::default()
+                .content("无效的协议格式。")
+                .ephemeral(true),
+        )
+        .await?;
+        return Ok(());
     };
 
     // 应用备份权限覆盖
@@ -236,16 +244,23 @@ async fn autocomplete_license(
     // 组合并过滤
     user_licenses
         .into_iter()
-        .map(|l| (l.license_name, l.id))
+        .map(|l| {
+            let name = l.license_name.clone();
+            let value = format!("user:{}", l.id);
+            (name, value)
+        })
         .chain(
             system_licenses
                 .into_iter()
-                .enumerate()
-                .map(|(i, l)| (l.license_name, -(i as i32 + 1))),
+                .map(|l| {
+                    let display_name = format!("{} (系统)", l.license_name);
+                    let value = format!("system:{}", l.license_name);
+                    (display_name, value)
+                }),
         )
         .filter(|(name, _)| name.to_lowercase().contains(&partial.to_lowercase()))
         .take(25)
-        .map(|(name, id)| poise::serenity_prelude::AutocompleteChoice::new(name, id))
+        .map(|(name, value)| poise::serenity_prelude::AutocompleteChoice::new(name, value))
         .into_iter()
 }
 
