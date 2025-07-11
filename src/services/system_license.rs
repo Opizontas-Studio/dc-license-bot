@@ -2,7 +2,7 @@ use std::path::Path;
 use tokio::sync::RwLock;
 
 use crate::{error::BotError, types::license::SystemLicense};
-
+#[derive(Debug)]
 pub struct SystemLicenseCache {
     licenses: RwLock<Vec<SystemLicense>>,
 }

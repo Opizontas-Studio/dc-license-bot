@@ -876,6 +876,7 @@ dependencies = [
  "reqwest 0.12.22",
  "sea-orm",
  "serde",
+ "serde_json",
  "serde_with",
  "serenity",
  "snafu",
@@ -3634,7 +3635,6 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "rust_decimal",
- "rustls 0.23.28",
  "serde",
  "serde_json",
  "sha2",
@@ -3646,7 +3646,6 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ pub mod config;
 pub mod database;
 pub mod error;
 pub mod handlers;
-mod services;
+pub mod services;
 pub mod utils;
 pub mod types;
 

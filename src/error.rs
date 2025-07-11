@@ -2,6 +2,18 @@ use snafu::{Location, Snafu};
 
 #[derive(Snafu, Debug)]
 pub enum BotError {
+    #[snafu(display("验证失败: {}", message))]
+    ValidationError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(transparent)]
+    SerdeJsonError {
+        #[snafu(implicit)]
+        loc: Location,
+        source: serde_json::Error,
+    },
     #[snafu(transparent)]
     ParseIntError {
         #[snafu(implicit)]

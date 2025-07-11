@@ -64,7 +64,18 @@ pub async fn publish_license(
     // 2. 获取选择的协议
     let license = if let Some(user_id_str) = license_id.strip_prefix("user:") {
         // 用户协议
-        let user_id = user_id_str.parse::<i32>().map_err(|_| BotError::InvalidInput("无效的协议ID".to_string()))?;
+        let user_id = match user_id_str.parse::<i32>() {
+            Ok(id) => id,
+            Err(_) => {
+                ctx.send(
+                    CreateReply::default()
+                        .content("无效的协议ID格式。")
+                        .ephemeral(true),
+                )
+                .await?;
+                return Ok(());
+            }
+        };
         let Some(license) = db
             .license()
             .get_license(user_id, ctx.author().id)
