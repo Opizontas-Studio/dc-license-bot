@@ -17,27 +17,8 @@ admin_role_ids = [
 
 ]
 
-# [功能配置]
-
-# 用户可创建的自定义协议上限
-max_user_licenses = 5
-# 用户未设置时，自动发布功能使用的默认系统授权名。
-# 必须是 "config/system_licenses.json" 中定义的有效 "name"。
-# 推荐值: "cc_by_nc_sa_4.0", "cc_by_nc_nd_4.0", "personal_use_only", "cc_by_nc_4.0"
-default_system_license = "cc_by_nc_4.0"
-
-# [与备份机器人同步]
 
 # 是否启用与备份Bot的同步功能
 backup_enabled = false
 # 备份Bot的接收端点 URL
 endpoint = "http://127.0.0.1:8199"
-
-# [速率限制]
-# 各命令的冷却时间（秒）。管理员不受影响。
-
-
-command_license = 10        # /授权
-command_create_license = 10  # /创建协议
-command_manage_license = 5   # /协议管理 (包括编辑、删除等操作)
-command_settings = 5        # /设置

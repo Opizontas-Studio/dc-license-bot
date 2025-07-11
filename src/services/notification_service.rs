@@ -42,6 +42,7 @@ pub struct Urls {
     pub direct_message: String,
 }
 
+#[derive(Debug)]
 pub struct NotificationService {
     client: Client,
     config: Arc<ArcSwap<BotCfg>>,
@@ -78,7 +79,7 @@ impl NotificationService {
             .json(payload)
             .send()
             .await
-            .whatever_context("发送通知请求时发生网络错误")?;
+            .whatever_context::<&str, BotError>("发送通知请求时发生网络错误")?;
 
         // 3. 处理响应
         if response.status().is_success() {
@@ -92,6 +93,63 @@ impl NotificationService {
                 message: format!("通知服务返回错误: {}", status),
                 source: None,
             })
+        }
+    }
+}
+
+// 通知载荷构造辅助函数
+impl NotificationPayload {
+    /// 从Discord上下文创建通知载荷
+    pub async fn from_discord_context(
+        guild_id: serenity::all::GuildId,
+        channel_id: serenity::all::ChannelId,
+        thread_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        author_id: serenity::all::UserId,
+        author_name: String,
+        display_name: String,
+        title: String,
+        content_preview: String,
+        license_type: String,
+        backup_allowed: bool,
+    ) -> Self {
+        let guild_id_str = guild_id.to_string();
+        let channel_id_str = channel_id.to_string();
+        let thread_id_str = thread_id.to_string();
+        let message_id_str = message_id.to_string();
+        
+        // 构造 URLs
+        let discord_thread_url = format!(
+            "https://discord.com/channels/{}/{}/{}",
+            guild_id_str, channel_id_str, thread_id_str
+        );
+        let direct_message_url = format!(
+            "https://discord.com/channels/{}/{}/{}",
+            guild_id_str, thread_id_str, message_id_str
+        );
+        
+        Self {
+            event_type: "backup_permission_update".to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            guild_id: guild_id_str,
+            channel_id: channel_id_str,
+            thread_id: thread_id_str,
+            message_id: message_id_str,
+            author: Author {
+                discord_user_id: author_id.to_string(),
+                username: author_name,
+                display_name,
+            },
+            work_info: WorkInfo {
+                title,
+                content_preview: content_preview.chars().take(100).collect(),
+                license_type,
+                backup_allowed,
+            },
+            urls: Urls {
+                discord_thread: discord_thread_url,
+                direct_message: direct_message_url,
+            },
         }
     }
 }

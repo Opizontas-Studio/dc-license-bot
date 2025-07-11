@@ -1,8 +1,8 @@
 use poise::{CreateReply, command};
 use serenity::all::*;
-use tracing::warn;
+use tracing::{warn, info, error};
 
-use crate::{commands::Context, error::BotError};
+use crate::{commands::Context, error::BotError, services::notification_service::NotificationPayload};
 
 #[command(
     slash_command,
@@ -215,10 +215,42 @@ pub async fn publish_license(
             // Pin新消息
             let _ = new_msg.pin(ctx).await;
 
+            // 检查备份权限是否变更
+            let backup_changed = db.published_posts()
+                .has_backup_permission_changed(thread.id, backup_allowed)
+                .await?;
+
             // 更新数据库
             db.published_posts()
                 .record_or_update(thread.id, new_msg.id, ctx.author().id, backup_allowed)
                 .await?;
+
+            // 如果备份权限发生变更，发送通知
+            if backup_changed {
+                info!("备份权限发生变更，发送通知");
+                
+                // 获取帖子首楼消息作为内容预览
+                let content_preview = get_thread_first_message_content(ctx, &thread).await
+                    .unwrap_or_else(|_| "无法获取内容预览".to_string());
+                
+                let notification_payload = NotificationPayload::from_discord_context(
+                    thread.guild_id,
+                    thread.parent_id.unwrap(), // 父频道ID
+                    thread.id,                 // 帖子ID
+                    new_msg.id,
+                    ctx.author().id,
+                    ctx.author().name.clone(),
+                    display_name.to_string(),
+                    thread.name.clone(),
+                    content_preview,
+                    license.license_name.clone(),
+                    backup_allowed,
+                ).await;
+                
+                if let Err(e) = ctx.data().notification_service.send_backup_notification(&notification_payload).await {
+                    error!("发送备份通知失败: {}", e);
+                }
+            }
 
             // 更新回复
             handler
@@ -341,4 +373,20 @@ fn create_license_embed(
         .footer(CreateEmbedFooter::new(format!("发布者: {}", display_name)))
         .timestamp(serenity::model::Timestamp::now())
         .colour(Colour::BLUE)
+}
+
+// 获取帖子首楼消息内容
+async fn get_thread_first_message_content(
+    ctx: Context<'_>,
+    thread: &GuildChannel,
+) -> Result<String, BotError> {
+    // 尝试获取帖子的首楼消息
+    // 通常帖子的首楼消息ID就是帖子ID本身
+    let first_message = ctx.http().get_message(thread.id, MessageId::new(thread.id.get())).await?;
+    
+    if !first_message.author.bot && !first_message.content.is_empty() {
+        Ok(first_message.content)
+    } else {
+        Ok("该帖子暂无文本内容".to_string())
+    }
 }

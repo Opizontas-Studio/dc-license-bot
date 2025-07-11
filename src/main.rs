@@ -5,7 +5,7 @@ use chrono::{FixedOffset, Utc};
 use clap::Parser;
 use dc_bot::{
     Args, commands::framework, config::BotCfg, database::BotDatabase, error::BotError, handlers::*,
-    services::system_license::SystemLicenseCache,
+    services::{system_license::SystemLicenseCache, notification_service::NotificationService},
 };
 use serenity::{Client, all::GatewayIntents};
 use tracing_subscriber::{
@@ -53,6 +53,9 @@ async fn main() -> Result<(), BotError> {
         SystemLicenseCache::new(std::path::Path::new(&Args::parse().default_licenses)).await?
     );
 
+    // Initialize notification service
+    let notification_service = Arc::new(NotificationService::new(cfg.clone()));
+
     let mut client = Client::builder(cfg.load().token.to_owned(), intents)
         .cache_settings({
             let mut s = serenity::cache::Settings::default();
@@ -65,7 +68,7 @@ async fn main() -> Result<(), BotError> {
         .type_map_insert::<BotDatabase>(db.to_owned())
         .type_map_insert::<BotCfg>(cfg.to_owned())
         .event_handler(PingHandler)
-        .framework(framework(db, cfg, system_license_cache))
+        .framework(framework(db, cfg, system_license_cache, notification_service))
         .await?;
 
     // Finally, start a single shard, and start listening to events.

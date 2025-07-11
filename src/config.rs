@@ -27,6 +27,7 @@ pub struct BotCfg {
     pub time_offset: i32,
     pub token: String,
     pub admin_role_ids: HashSet<RoleId>,
+    pub backup_enabled: bool,
     pub endpoint: Url,
     pub extra_admins_ids: HashSet<UserId>,
     #[serde(skip)]

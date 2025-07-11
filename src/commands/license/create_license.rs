@@ -82,7 +82,7 @@ pub async fn create_license(
                 itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
                 reply
-                    .edit(ctx, CreateReply::default().content("您最多只能创建5个协议"))
+                    .edit(ctx, CreateReply::default().content("您最多只能创建5个协议,请使用`/协议管理`删除不需要的协议").components(vec![]))
                     .await?;
                 return Ok(());
             }
@@ -102,7 +102,7 @@ pub async fn create_license(
             itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
                 .await?;
             reply
-                .edit(ctx, CreateReply::default().content("协议已创建"))
+                .edit(ctx, CreateReply::default().content("协议已创建").components(vec![]))
                 .await?;
         }
         _ => {
