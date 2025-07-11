@@ -12,7 +12,7 @@ use snafu::OptionExt;
 use system::*;
 use tracing::{error, info};
 
-use crate::{config::BotCfg, database::BotDatabase, error::BotError};
+use crate::{config::BotCfg, database::BotDatabase, error::BotError, services::system_license::SystemLicenseCache};
 
 pub type Context<'a> = poise::Context<'a, Data, BotError>;
 
@@ -34,6 +34,7 @@ pub async fn check_admin(ctx: Context<'_>) -> Result<bool, BotError> {
 pub struct Data {
     db: BotDatabase,
     cfg: Arc<ArcSwap<BotCfg>>,
+    system_license_cache: Arc<SystemLicenseCache>,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, BotError>) {
@@ -90,14 +91,14 @@ fn option(cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
     }
 }
 
-pub fn framework(db: BotDatabase, cfg: Arc<ArcSwap<BotCfg>>) -> poise::Framework<Data, BotError> {
+pub fn framework(db: BotDatabase, cfg: Arc<ArcSwap<BotCfg>>, system_license_cache: Arc<SystemLicenseCache>) -> poise::Framework<Data, BotError> {
     poise::Framework::builder()
         .options(option(&cfg))
         .setup(|_, _, _| {
             Box::pin(async move {
                 // This is run when the framework is set up
                 info!("Framework has been set up!");
-                Ok(Data { db, cfg })
+                Ok(Data { db, cfg, system_license_cache })
             })
         })
         .build()

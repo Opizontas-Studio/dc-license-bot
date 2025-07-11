@@ -5,3 +5,4 @@ config.json
 sqlite.*
 .vscode
 CLAUDE.md
+data/

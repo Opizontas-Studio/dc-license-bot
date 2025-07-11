@@ -6,7 +6,7 @@ use serenity::all::{
 };
 
 use super::super::Context;
-use crate::{error::BotError, types::license::{DefaultLicenseIdentifier, SystemLicense}};
+use crate::{error::BotError, types::license::DefaultLicenseIdentifier};
 
 #[command(
     slash_command,
@@ -38,7 +38,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             }
             Some(DefaultLicenseIdentifier::System(name)) => {
                 // Verify the system license exists
-                let system_licenses = SystemLicense::read_system_licenses()?;
+                let system_licenses = ctx.data().system_license_cache.get_all().await;
                 if system_licenses.iter().any(|l| l.license_name == name) {
                     format!("{} (系统)", name)
                 } else {
@@ -105,7 +105,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                     .await?;
                 // Get both user licenses and system licenses
                 let user_licenses = db.license().get_user_licenses(ctx.author().id).await?;
-                let system_licenses = SystemLicense::read_system_licenses()?;
+                let system_licenses = ctx.data().system_license_cache.get_all().await;
                 
                 // Create options for both user and system licenses
                 let mut options = Vec::new();

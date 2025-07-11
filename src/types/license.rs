@@ -1,8 +1,6 @@
-use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
 
-use crate::error::BotError;
 use entities::user_licenses::Model as LicenseModel;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,12 +30,6 @@ impl From<LicenseModel> for SystemLicense {
 }
 
 impl SystemLicense {
-    pub fn read_system_licenses() -> Result<Vec<SystemLicense>, BotError> {
-        let path = crate::Args::parse().default_licenses;
-        let string = std::fs::read_to_string(path)?;
-        Ok(serenity::json::from_str(&string)?)
-    }
-
     pub fn to_user_license(&self, user_id: UserId, index: i32) -> LicenseModel {
         LicenseModel {
             id: index,

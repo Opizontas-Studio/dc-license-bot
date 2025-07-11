@@ -2,7 +2,7 @@ use poise::{CreateReply, command};
 use serenity::all::*;
 use tracing::warn;
 
-use crate::{commands::Context, error::BotError, types::license::SystemLicense};
+use crate::{commands::Context, error::BotError};
 
 #[command(
     slash_command,
@@ -81,7 +81,7 @@ pub async fn publish_license(
         license
     } else if let Some(system_name) = license_id.strip_prefix("system:") {
         // 系统协议
-        let system_licenses = SystemLicense::read_system_licenses().unwrap_or_default();
+        let system_licenses = ctx.data().system_license_cache.get_all().await;
         let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) else {
             ctx.send(
                 CreateReply::default()
@@ -239,7 +239,7 @@ async fn autocomplete_license(
         Err(_) => vec![],
     };
 
-    let system_licenses = SystemLicense::read_system_licenses().unwrap_or_default();
+    let system_licenses = ctx.data().system_license_cache.get_all().await;
 
     // 组合并过滤
     user_licenses
