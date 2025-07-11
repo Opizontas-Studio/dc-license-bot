@@ -168,17 +168,35 @@ pub async fn publish_license(
                     .get_message(thread.id, MessageId::new(existing.message_id as u64))
                     .await
                 {
-                    let _ = old_msg
-                        .edit(
-                            ctx,
-                            EditMessage::new().embed(
-                                CreateEmbed::new()
-                                    .title("⚠️ 此协议已作废")
-                                    .description("此协议已被新协议替换。")
-                                    .colour(Colour::RED),
-                            ),
-                        )
-                        .await;
+                    // 获取原有的 embed
+                    if let Some(original_embed) = old_msg.embeds.first() {
+                        let mut updated_embed = CreateEmbed::new()
+                            .title(format!("⚠️ [已作废] {}", original_embed.title.as_deref().unwrap_or("授权协议")))
+                            .description(format!(
+                                "**此协议已被新协议替换**\n\n{}",
+                                original_embed.description.as_deref().unwrap_or("")
+                            ))
+                            .colour(Colour::from_rgb(128, 128, 128)); // 灰色表示已作废
+                        
+                        // 保留原有的字段
+                        for field in &original_embed.fields {
+                            updated_embed = updated_embed.field(&field.name, &field.value, field.inline);
+                        }
+                        
+                        // 保留原有的 footer 并添加作废时间
+                        if let Some(footer) = &original_embed.footer {
+                            updated_embed = updated_embed.footer(CreateEmbedFooter::new(
+                                format!("{} | 作废于 {}", 
+                                    &footer.text, 
+                                    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
+                                )
+                            ));
+                        }
+                        
+                        let _ = old_msg
+                            .edit(ctx, EditMessage::new().embed(updated_embed))
+                            .await;
+                    }
 
                     // Unpin旧消息
                     let _ = old_msg.unpin(ctx).await;
@@ -316,7 +334,7 @@ fn create_license_embed(
             license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
             false,
         )
-        .footer(CreateEmbedFooter::new(format!("发布者: {}", author.name)))
+        .footer(CreateEmbedFooter::new(format!("发布者: <@{}>", author.id)))
         .timestamp(serenity::model::Timestamp::now())
         .colour(Colour::BLUE)
 }
