@@ -8,14 +8,15 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub user_id: i64,
     pub auto_publish_enabled: bool,
-    pub default_license_id: Option<i32>,
+    pub default_user_license_id: Option<i32>,
+    pub default_system_license_name: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::user_licenses::Entity",
-        from = "Column::DefaultLicenseId",
+        from = "Column::DefaultUserLicenseId",
         to = "super::user_licenses::Column::Id",
         on_update = "NoAction",
         on_delete = "SetNull"
