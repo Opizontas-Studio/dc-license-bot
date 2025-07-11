@@ -7,8 +7,7 @@ use crate::{error::BotError, types::license::DefaultLicenseIdentifier, utils::Li
 
 #[command(
     slash_command,
-    owners_only,
-    global_cooldown = 10,
+    user_cooldown = 10,
     name_localized("zh-CN", "自动发布设置"),
     description_localized("zh-CN", "编辑自动发布设置"),
     ephemeral

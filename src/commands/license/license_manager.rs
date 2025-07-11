@@ -40,8 +40,7 @@ struct EditLicenseModal {
 #[command(
     slash_command,
     guild_only,
-    owners_only,
-    global_cooldown = 10,
+    user_cooldown = 10,
     name_localized("zh-CN", "协议管理"),
     description_localized("zh-CN", "管理现有协议"),
     ephemeral

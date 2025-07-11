@@ -6,8 +6,7 @@ use crate::{commands::Context, error::BotError, services::license::LicensePublis
 
 #[command(
     slash_command,
-    owners_only,
-    global_cooldown = 10,
+    user_cooldown = 10,
     name_localized("zh-CN", "发布协议"),
     description_localized("zh-CN", "在当前帖子发布协议"),
     ephemeral
