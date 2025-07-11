@@ -3,7 +3,7 @@ use serenity::all::*;
 use tracing::warn;
 
 use super::super::Context;
-use crate::error::BotError;
+use crate::{error::BotError, utils::LicenseEmbedBuilder};
 
 #[derive(Modal)]
 struct LicenseModal {
@@ -50,7 +50,7 @@ pub async fn create_license(
     } else {
         None
     };
-    let preview_license_embed = preview(
+    let preview_license_embed = LicenseEmbedBuilder::create_license_preview_embed(
         &name,
         redis,
         modify,
@@ -113,27 +113,3 @@ pub async fn create_license(
     Ok(())
 }
 
-fn preview(
-    name: &str,
-    redis: bool,
-    modify: bool,
-    rest: Option<&str>,
-    backup: Option<bool>,
-) -> CreateEmbed {
-    CreateEmbed::default()
-        .title("协议预览")
-        .description(format!("协议名称: {}", name))
-        .colour(Colour::DARK_GREEN)
-        .field("二传", if redis { "允许" } else { "不允许" }, false)
-        .field("二改", if modify { "允许" } else { "不允许" }, false)
-        .field("限制条件", rest.as_deref().unwrap_or("无"), false)
-        .field(
-            "备份权限",
-            if backup.unwrap_or(false) {
-                "允许"
-            } else {
-                "不允许"
-            },
-            false,
-        )
-}

@@ -1,5 +1,5 @@
 use serenity::all::{
-    ChannelId, Colour, CreateEmbed, CreateEmbedFooter, CreateMessage, EditMessage, 
+    ChannelId, CreateMessage, EditMessage, 
     GuildChannel, Http, MessageId, UserId
 };
 use tracing::{error, info};
@@ -8,6 +8,7 @@ use crate::{
     commands::Data,
     error::BotError,
     services::notification_service::NotificationPayload,
+    utils::LicenseEmbedBuilder,
 };
 
 pub struct LicensePublishService;
@@ -43,28 +44,20 @@ impl LicensePublishService {
             {
                 // 获取原有的 embed
                 if let Some(original_embed) = old_msg.embeds.first() {
-                    let mut updated_embed = CreateEmbed::new()
-                        .title(format!("⚠️ [已作废] {}", original_embed.title.as_deref().unwrap_or("授权协议")))
-                        .description(format!(
-                            "**此协议已被新协议替换**\n\n{}",
-                            original_embed.description.as_deref().unwrap_or("")
-                        ))
-                        .colour(Colour::from_rgb(128, 128, 128)); // 灰色表示已作废
+                    let fields: Vec<(String, String, bool)> = original_embed
+                        .fields
+                        .iter()
+                        .map(|f| (f.name.clone(), f.value.clone(), f.inline))
+                        .collect();
                     
-                    // 保留原有的字段
-                    for field in &original_embed.fields {
-                        updated_embed = updated_embed.field(&field.name, &field.value, field.inline);
-                    }
+                    let footer_text = original_embed.footer.as_ref().map(|f| f.text.as_str());
                     
-                    // 保留原有的 footer 并添加作废时间
-                    if let Some(footer) = &original_embed.footer {
-                        updated_embed = updated_embed.footer(CreateEmbedFooter::new(
-                            format!("{} | 作废于 {}", 
-                                &footer.text, 
-                                chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
-                            )
-                        ));
-                    }
+                    let updated_embed = LicenseEmbedBuilder::create_obsolete_license_embed(
+                        original_embed.title.as_deref().unwrap_or("授权协议"),
+                        original_embed.description.as_deref().unwrap_or(""),
+                        &fields,
+                        footer_text,
+                    );
                     
                     let _ = old_msg
                         .edit(http, EditMessage::new().embed(updated_embed))
@@ -77,7 +70,7 @@ impl LicensePublishService {
         }
 
         // 2. 发布新协议
-        let license_embed = Self::create_license_embed(license, backup_allowed, display_name);
+        let license_embed = LicenseEmbedBuilder::create_license_embed(license, backup_allowed, display_name);
         let new_msg = ChannelId::new(thread.id.get())
             .send_message(http, CreateMessage::new().embed(license_embed))
             .await?;
@@ -128,51 +121,6 @@ impl LicensePublishService {
         Ok(())
     }
 
-    /// 创建协议embed
-    pub fn create_license_embed(
-        license: &entities::user_licenses::Model,
-        backup_allowed: bool,
-        display_name: &str,
-    ) -> CreateEmbed {
-        CreateEmbed::new()
-            .title(format!("📜 授权协议: {}", license.license_name))
-            .description("本帖子内容受以下授权协议保护：")
-            .field(
-                "允许二次传播",
-                if license.allow_redistribution {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许二次修改",
-                if license.allow_modification {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许备份",
-                if backup_allowed {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "限制条件",
-                license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
-                false,
-            )
-            .footer(CreateEmbedFooter::new(format!("发布者: {}", display_name)))
-            .timestamp(serenity::model::Timestamp::now())
-            .colour(Colour::BLUE)
-    }
 
     /// 获取帖子首楼消息内容
     async fn get_thread_first_message_content(

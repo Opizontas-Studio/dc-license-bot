@@ -2,7 +2,7 @@ use poise::{CreateReply, command};
 use serenity::all::*;
 use tracing::warn;
 
-use crate::{commands::Context, error::BotError, services::license::LicensePublishService};
+use crate::{commands::Context, error::BotError, services::license::LicensePublishService, utils::LicenseEmbedBuilder};
 
 #[command(
     slash_command,
@@ -123,7 +123,7 @@ pub async fn publish_license(
     let display_name = ctx.author_member().await
         .map(|m| m.display_name().to_string())
         .unwrap_or_else(|| ctx.author().name.clone());
-    let preview_embed = LicensePublishService::create_license_embed(&license, backup_allowed, &display_name);
+    let preview_embed = LicenseEmbedBuilder::create_license_embed(&license, backup_allowed, &display_name);
 
     // 创建按钮
     let publish_btn = CreateButton::new("publish_license")
@@ -178,15 +178,7 @@ pub async fn publish_license(
                 .edit(
                     ctx,
                     CreateReply::default()
-                        .embed(
-                            CreateEmbed::new()
-                                .title("✅ 协议已发布")
-                                .description(format!(
-                                    "协议 '{}' 已成功发布到当前帖子。",
-                                    license.license_name
-                                ))
-                                .colour(Colour::DARK_GREEN),
-                        )
+                        .embed(LicenseEmbedBuilder::create_license_published_embed(&license.license_name))
                         .components(vec![]),
                 )
                 .await?;

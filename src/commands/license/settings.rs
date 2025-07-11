@@ -1,12 +1,9 @@
 use futures::StreamExt;
 use poise::{CreateReply, command};
-use serenity::all::{
-    colours::branding::{GREEN, RED, YELLOW},
-    *,
-};
+use serenity::all::*;
 
 use super::super::Context;
-use crate::{error::BotError, types::license::DefaultLicenseIdentifier};
+use crate::{error::BotError, types::license::DefaultLicenseIdentifier, utils::LicenseEmbedBuilder};
 
 #[command(
     slash_command,
@@ -47,16 +44,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             }
             None => "未设置".to_string(),
         };
-        Ok(CreateEmbed::new()
-            .title("🔧 自动发布设置")
-            .description("以下是自动发布的设置选项：")
-            .field(
-                "自动发布",
-                auto_copyright.then(|| "启用").unwrap_or_else(|| "禁用"),
-                true,
-            )
-            .field("默认协议", name, true)
-            .colour(if auto_copyright { GREEN } else { RED }))
+        Ok(LicenseEmbedBuilder::create_auto_publish_settings_embed(auto_copyright, name))
     };
     let enable_btn = CreateButton::new("toggle_auto_publish")
         .label("切换自动发布设置")
@@ -134,12 +122,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                     handler
                         .edit(
                             ctx,
-                            create_reply(
-                                create_embed()
-                                    .await?
-                                    .description("没有可用的协议。")
-                                    .colour(YELLOW),
-                            ),
+                            create_reply(LicenseEmbedBuilder::create_settings_no_license_embed()),
                         )
                         .await?;
                     continue;

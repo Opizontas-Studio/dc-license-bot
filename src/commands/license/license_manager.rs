@@ -3,7 +3,7 @@ use serenity::all::*;
 use tracing::warn;
 
 use super::super::Context;
-use crate::error::BotError;
+use crate::{error::BotError, utils::LicenseEmbedBuilder};
 
 #[derive(Debug, Modal)]
 #[name = "编辑协议"]
@@ -51,17 +51,14 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
     // get the user's licenses from the database
     let licenses = db.license().get_user_licenses(ctx.author().id).await?;
     // if the user has no licenses, send a message and return
-    let embed = CreateEmbed::new()
-        .title("📜 协议管理")
-        .description("选择您要管理的协议：")
-        .colour(Colour::DARK_BLUE);
     if licenses.is_empty() {
         let reply = CreateReply::default()
-            .embed(embed.field("无协议", "您还没有创建任何协议。", false))
+            .embed(LicenseEmbedBuilder::create_no_license_embed())
             .ephemeral(true);
         ctx.send(reply).await?;
         return Ok(());
     }
+    let embed = LicenseEmbedBuilder::create_license_manager_embed();
     // create a select menu with the user's licenses
     let options = licenses
         .into_iter()
@@ -126,28 +123,7 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
 
     // Create function to generate the second menu embed
     let create_second_menu_embed = |license: &entities::entities::user_licenses::Model| {
-        CreateEmbed::new()
-            .title(format!("协议名称: {}", license.license_name))
-            .description(format!(
-                "协议内容:\n\n**二传:** {}\n**二改:** {}\n**限制条件:** {}\n**备份权限:** {}",
-                if license.allow_redistribution {
-                    "允许"
-                } else {
-                    "不允许"
-                },
-                if license.allow_modification {
-                    "允许"
-                } else {
-                    "不允许"
-                },
-                license.restrictions_note.as_deref().unwrap_or("无"),
-                if license.allow_backup {
-                    "允许"
-                } else {
-                    "不允许"
-                }
-            ))
-            .colour(Colour::DARK_BLUE)
+        LicenseEmbedBuilder::create_license_detail_embed(license)
     };
 
     // Create buttons for the second menu
@@ -199,15 +175,7 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                 .edit(
                     ctx,
                     CreateReply::default()
-                        .embed(
-                            CreateEmbed::new()
-                                .title("✅ 协议已删除")
-                                .description(format!(
-                                    "协议 '{}' 已成功删除。",
-                                    license.license_name
-                                ))
-                                .colour(colours::branding::GREEN),
-                        )
+                        .embed(LicenseEmbedBuilder::create_license_deleted_embed(&license.license_name))
                         .components(vec![]),
                 )
                 .await?;

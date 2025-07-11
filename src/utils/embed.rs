@@ -1,0 +1,180 @@
+use serenity::all::{Colour, CreateEmbed, CreateEmbedFooter, Timestamp};
+use entities::user_licenses::Model as UserLicense;
+
+/// 协议相关的嵌入消息构建工具
+pub struct LicenseEmbedBuilder;
+
+impl LicenseEmbedBuilder {
+    /// 创建协议管理主菜单embed
+    pub fn create_license_manager_embed() -> CreateEmbed {
+        CreateEmbed::new()
+            .title("📜 协议管理")
+            .description("选择您要管理的协议：")
+            .colour(Colour::DARK_BLUE)
+    }
+
+    /// 创建协议详情展示embed
+    pub fn create_license_detail_embed(license: &UserLicense) -> CreateEmbed {
+        CreateEmbed::new()
+            .title(format!("协议名称: {}", license.license_name))
+            .description(format!(
+                "协议内容:\n\n**二传:** {}\n**二改:** {}\n**限制条件:** {}\n**备份权限:** {}",
+                if license.allow_redistribution { "允许" } else { "不允许" },
+                if license.allow_modification { "允许" } else { "不允许" },
+                license.restrictions_note.as_deref().unwrap_or("无"),
+                if license.allow_backup { "允许" } else { "不允许" }
+            ))
+            .colour(Colour::DARK_BLUE)
+    }
+
+    /// 创建协议删除成功embed
+    pub fn create_license_deleted_embed(license_name: &str) -> CreateEmbed {
+        CreateEmbed::new()
+            .title("✅ 协议已删除")
+            .description(format!("协议 '{}' 已成功删除。", license_name))
+            .colour(serenity::all::colours::branding::GREEN)
+    }
+
+    /// 创建协议预览embed
+    pub fn create_license_preview_embed(
+        name: &str,
+        redis: bool,
+        modify: bool,
+        rest: Option<&str>,
+        backup: Option<bool>,
+    ) -> CreateEmbed {
+        CreateEmbed::new()
+            .title("协议预览")
+            .description(format!("协议名称: {}", name))
+            .colour(Colour::DARK_GREEN)
+            .field("二传", if redis { "允许" } else { "不允许" }, false)
+            .field("二改", if modify { "允许" } else { "不允许" }, false)
+            .field("限制条件", rest.unwrap_or("无"), false)
+            .field(
+                "备份权限",
+                if backup.unwrap_or(false) { "允许" } else { "不允许" },
+                false,
+            )
+    }
+
+    /// 创建协议发布成功embed
+    pub fn create_license_published_embed(license_name: &str) -> CreateEmbed {
+        CreateEmbed::new()
+            .title("✅ 协议已发布")
+            .description(format!("协议 '{}' 已成功发布到当前帖子。", license_name))
+            .colour(Colour::DARK_GREEN)
+    }
+
+    /// 创建自动发布设置embed
+    pub fn create_auto_publish_settings_embed(
+        auto_copyright: bool,
+        license_name: String,
+    ) -> CreateEmbed {
+        CreateEmbed::new()
+            .title("🔧 自动发布设置")
+            .description("以下是自动发布的设置选项：")
+            .field(
+                "自动发布",
+                if auto_copyright { "启用" } else { "禁用" },
+                true,
+            )
+            .field("默认协议", license_name, true)
+            .colour(if auto_copyright {
+                serenity::all::colours::branding::GREEN
+            } else {
+                serenity::all::colours::branding::RED
+            })
+    }
+
+    /// 创建协议发布embed（用于实际发布的协议消息）
+    pub fn create_license_embed(
+        license: &UserLicense,
+        backup_allowed: bool,
+        display_name: &str,
+    ) -> CreateEmbed {
+        CreateEmbed::new()
+            .title(format!("📜 授权协议: {}", license.license_name))
+            .description("本帖子内容受以下授权协议保护：")
+            .field(
+                "允许二次传播",
+                if license.allow_redistribution {
+                    "✅ 允许"
+                } else {
+                    "❌ 不允许"
+                },
+                true,
+            )
+            .field(
+                "允许二次修改",
+                if license.allow_modification {
+                    "✅ 允许"
+                } else {
+                    "❌ 不允许"
+                },
+                true,
+            )
+            .field(
+                "允许备份",
+                if backup_allowed {
+                    "✅ 允许"
+                } else {
+                    "❌ 不允许"
+                },
+                true,
+            )
+            .field(
+                "限制条件",
+                license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
+                false,
+            )
+            .footer(CreateEmbedFooter::new(format!("发布者: {}", display_name)))
+            .timestamp(Timestamp::now())
+            .colour(Colour::BLUE)
+    }
+
+    /// 创建作废协议embed
+    pub fn create_obsolete_license_embed(
+        original_title: &str,
+        original_description: &str,
+        original_fields: &[(String, String, bool)],
+        original_footer: Option<&str>,
+    ) -> CreateEmbed {
+        let mut embed = CreateEmbed::new()
+            .title(format!("⚠️ [已作废] {}", original_title))
+            .description(format!(
+                "**此协议已被新协议替换**\n\n{}",
+                original_description
+            ))
+            .colour(Colour::from_rgb(128, 128, 128)); // 灰色表示已作废
+
+        // 添加原有字段
+        for (name, value, inline) in original_fields {
+            embed = embed.field(name, value, *inline);
+        }
+
+        // 添加footer
+        if let Some(footer_text) = original_footer {
+            embed = embed.footer(CreateEmbedFooter::new(format!(
+                "{} | 作废于 {}",
+                footer_text,
+                chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
+            )));
+        }
+
+        embed
+    }
+
+    /// 创建无协议embed
+    pub fn create_no_license_embed() -> CreateEmbed {
+        Self::create_license_manager_embed()
+            .field("无协议", "您还没有创建任何协议。", false)
+    }
+
+    /// 创建设置页面无协议embed
+    pub fn create_settings_no_license_embed() -> CreateEmbed {
+        CreateEmbed::new()
+            .title("🔧 自动发布设置")
+            .description("没有可用的协议。")
+            .colour(serenity::all::colours::branding::YELLOW)
+    }
+}
