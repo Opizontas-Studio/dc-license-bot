@@ -169,16 +169,12 @@ impl LicenseEmbedBuilder {
             embed = embed.field(name, value, *inline);
         }
 
-        // 添加footer
+        // 添加footer和时间戳
         if let Some(footer_text) = original_footer {
-            embed = embed.footer(CreateEmbedFooter::new(format!(
-                "{} | 作废于 {}",
-                footer_text,
-                chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
-            )));
+            embed = embed.footer(CreateEmbedFooter::new(format!("{} | 已作废", footer_text)));
         }
-
-        embed
+        
+        embed.timestamp(Timestamp::now())
     }
 
     /// 创建无协议embed
