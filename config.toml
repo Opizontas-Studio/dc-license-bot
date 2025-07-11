@@ -6,10 +6,7 @@ token = "MTM4OTAxNjgyNzQ4NDU3MzgwOA.GALlNn.V-KPnum5rWOezUXj4X3i34NJiRAxX-5Hd7btN
 time_offset = 7200
 # [安全与权限]
 
-guild_ids = [
-    1376876143059144714,
-]
-# 拥有特殊权限并免疫速率限制的用户ID列表。
+# 拥有特殊权限的用户ID列表。
 extra_admins_ids = [
     801430773600485407,239838081316945921
 ]
