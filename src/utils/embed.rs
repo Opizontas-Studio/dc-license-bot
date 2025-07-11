@@ -94,7 +94,7 @@ impl LicenseEmbedBuilder {
     ) -> CreateEmbed {
         CreateEmbed::new()
             .title(format!("📜 授权协议: {}", license.license_name))
-            .description("本帖子内容受以下授权协议保护：")
+            .description("本作品内容受以下授权协议保护：")
             .field(
                 "允许二次传播",
                 if license.allow_redistribution {
@@ -127,7 +127,7 @@ impl LicenseEmbedBuilder {
                 license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
                 false,
             )
-            .footer(CreateEmbedFooter::new(format!("发布者: {}", display_name)))
+            .footer(CreateEmbedFooter::new(format!("作者: {}", display_name)))
             .timestamp(Timestamp::now())
             .colour(Colour::BLUE)
     }
