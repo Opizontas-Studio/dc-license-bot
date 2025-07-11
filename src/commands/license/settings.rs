@@ -6,7 +6,7 @@ use serenity::all::{
 };
 
 use super::super::Context;
-use crate::error::BotError;
+use crate::{error::BotError, types::license::{DefaultLicenseIdentifier, SystemLicense}};
 
 #[command(
     slash_command,
@@ -26,16 +26,26 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             .await?;
         let default_license = db
             .user_settings()
-            .get_default_license_id(ctx.author().id)
+            .get_default_license(ctx.author().id)
             .await?;
-        let name = if let Some(license) = default_license {
-            db.license()
-                .get_license(license, ctx.author().id)
-                .await?
-                .map(|l| l.license_name)
-                .unwrap_or_else(|| "未设置".to_string())
-        } else {
-            "未设置".to_string()
+        let name = match default_license {
+            Some(DefaultLicenseIdentifier::User(id)) => {
+                db.license()
+                    .get_license(id, ctx.author().id)
+                    .await?
+                    .map(|l| l.license_name)
+                    .unwrap_or_else(|| "未设置".to_string())
+            }
+            Some(DefaultLicenseIdentifier::System(name)) => {
+                // Verify the system license exists
+                let system_licenses = SystemLicense::read_system_licenses()?;
+                if system_licenses.iter().any(|l| l.license_name == name) {
+                    format!("{} (系统)", name)
+                } else {
+                    "未设置".to_string()
+                }
+            }
+            None => "未设置".to_string(),
         };
         Ok(CreateEmbed::new()
             .title("🔧 自动发布设置")
@@ -93,27 +103,47 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 first_interaction
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
-                let licenses = db.license().get_user_licenses(ctx.author().id).await?;
-                if licenses.is_empty() {
+                // Get both user licenses and system licenses
+                let user_licenses = db.license().get_user_licenses(ctx.author().id).await?;
+                let system_licenses = SystemLicense::read_system_licenses()?;
+                
+                // Create options for both user and system licenses
+                let mut options = Vec::new();
+                
+                // Add user licenses
+                for license in user_licenses {
+                    options.push(
+                        CreateSelectMenuOption::new(
+                            license.license_name.clone(), 
+                            format!("user:{}", license.id)
+                        )
+                    );
+                }
+                
+                // Add system licenses
+                for license in system_licenses {
+                    options.push(
+                        CreateSelectMenuOption::new(
+                            format!("{} (系统)", license.license_name), 
+                            format!("system:{}", license.license_name)
+                        )
+                    );
+                }
+                
+                if options.is_empty() {
                     handler
                         .edit(
                             ctx,
                             create_reply(
                                 create_embed()
                                     .await?
-                                    .description("您还没有任何协议，请先创建一个协议。")
+                                    .description("没有可用的协议。")
                                     .colour(YELLOW),
                             ),
                         )
                         .await?;
                     continue;
                 }
-                let options = licenses
-                    .into_iter()
-                    .map(|license| {
-                        CreateSelectMenuOption::new(license.license_name, license.id.to_string())
-                    })
-                    .collect();
                 let select_menu = CreateSelectMenu::new(
                     "set_default_license_select",
                     CreateSelectMenuKind::String { options },
@@ -141,14 +171,18 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                     &first_interaction.data.kind
                 {
                     if let Some(selected) = values.first() {
-                        let license_id = if selected == "none" {
+                        let license = if selected == "none" {
                             None
+                        } else if let Some(user_id) = selected.strip_prefix("user:") {
+                            user_id.parse::<i32>().ok().map(DefaultLicenseIdentifier::User)
+                        } else if let Some(system_name) = selected.strip_prefix("system:") {
+                            Some(DefaultLicenseIdentifier::System(system_name.to_string()))
                         } else {
-                            selected.parse::<i32>().ok()
+                            None
                         };
 
                         db.user_settings()
-                            .set_default_license(ctx.author().id, license_id)
+                            .set_default_license(ctx.author().id, license)
                             .await?;
 
                         first_interaction
