@@ -3,6 +3,10 @@ use serenity::all::{
     CreateMessage, GuildChannel, Timestamp, UserId, Colour, Context, CreateInteractionResponse,
     CreateInteractionResponseMessage
 };
+use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::time::Instant;
+use tokio::sync::RwLock;
 use crate::{
     commands::Data,
     error::BotError,
@@ -10,11 +14,35 @@ use crate::{
     services::license::LicensePublishService,
 };
 
+// 线程创建事件去重缓存，存储最近处理过的线程ID和处理时间
+static PROCESSED_THREADS: OnceLock<RwLock<HashMap<u64, Instant>>> = OnceLock::new();
+
 pub async fn handle_thread_create(
     ctx: &Context,
     thread: &GuildChannel,
     data: &Data,
 ) -> Result<(), BotError> {
+    // 0. 去重检查 - 防止Discord事件重复触发
+    let thread_id = thread.id.get();
+    let now = Instant::now();
+    
+    {
+        let cache = PROCESSED_THREADS.get_or_init(|| RwLock::new(HashMap::new()));
+        let mut write_cache = cache.write().await;
+        
+        // 检查是否已处理过（5分钟内）
+        if let Some(&processed_time) = write_cache.get(&thread_id) {
+            if now.duration_since(processed_time).as_secs() < 300 {
+                tracing::debug!("Thread {} already processed, skipping duplicate event", thread_id);
+                return Ok(());
+            }
+        }
+        
+        // 清理过期记录并标记当前线程
+        write_cache.retain(|_, &mut time| now.duration_since(time).as_secs() < 300);
+        write_cache.insert(thread_id, now);
+    }
+
     // 1. 获取帖子创建者
     let Some(owner_id) = thread.owner_id else { return Ok(()); };
 
@@ -47,7 +75,16 @@ pub async fn handle_thread_create(
     };
 
     // 5. 构建交互式面板 (Embed + 确认/取消按钮)
-    let embed = create_license_preview_embed(&license_model, owner_id).await?;
+    let display_name = thread.guild_id.member(&ctx.http, owner_id).await
+        .map(|m| m.display_name().to_string())
+        .unwrap_or_else(|_| {
+            // 备用方案：从缓存获取用户名
+            ctx.cache.user(owner_id)
+                .map(|u| u.name.clone())
+                .unwrap_or_else(|| format!("{}", owner_id.get()))
+        });
+    
+    let embed = create_license_preview_embed(&license_model, &display_name).await?;
     
     let confirm_btn = CreateButton::new("confirm_auto_publish")
         .label("✅ 确认发布")
@@ -72,7 +109,7 @@ pub async fn handle_thread_create(
     let Some(interaction) = sent_message
         .await_component_interaction(&ctx.shard)
         .author_id(owner_id)
-        .timeout(std::time::Duration::from_secs(300)) // 5分钟超时
+        .timeout(std::time::Duration::from_secs(180)) // 3分钟超时
         .await else {
         // 超时，删除消息
         let _ = sent_message.delete(&ctx.http).await;
@@ -82,11 +119,6 @@ pub async fn handle_thread_create(
     match interaction.data.custom_id.as_str() {
         "confirm_auto_publish" => {
             // 确认发布 - 使用统一的发布服务
-            let display_name = ctx.cache
-                .member(thread.guild_id, owner_id)
-                .map(|m| m.display_name().to_string())
-                .unwrap_or_else(|| format!("<@{}>", owner_id.get()));
-            
             LicensePublishService::publish(
                 &ctx.http,
                 data,
@@ -127,10 +159,10 @@ pub async fn handle_thread_create(
 
 async fn create_license_preview_embed(
     license: &entities::user_licenses::Model,
-    owner_id: UserId,
+    display_name: &str,
 ) -> Result<CreateEmbed, BotError> {
     Ok(CreateEmbed::new()
-        .title(format!("📜 准备发布协议: {}", license.license_name))
+        .title("📜 准备发布协议")
         .description("检测到您启用了自动发布功能，是否要为此帖子发布以下协议？")
         .field("允许二次传播", 
                if license.allow_redistribution { "✅ 允许" } else { "❌ 不允许" }, true)
@@ -140,7 +172,7 @@ async fn create_license_preview_embed(
                if license.allow_backup { "✅ 允许" } else { "❌ 不允许" }, true)
         .field("限制条件", 
                license.restrictions_note.as_deref().unwrap_or("无特殊限制"), false)
-        .footer(CreateEmbedFooter::new(format!("作者: <@{}>", owner_id.get())))
+        .footer(CreateEmbedFooter::new(format!("作者: {}", display_name)))
         .timestamp(Timestamp::now())
         .colour(Colour::GOLD))
 }
