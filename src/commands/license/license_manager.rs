@@ -14,13 +14,13 @@ struct EditLicenseModal {
     #[max_length = 100]
     license_name: String,
 
-    #[name = "允许二传（是/否）"]
+    #[name = "允许社区内二传（是/否）"]
     #[placeholder = "是 或 否"]
     #[min_length = 1]
     #[max_length = 2]
     allow_redistribution: String,
 
-    #[name = "允许二改（是/否）"]
+    #[name = "允许社区内二改（是/否）"]
     #[placeholder = "是 或 否"]
     #[min_length = 1]
     #[max_length = 2]

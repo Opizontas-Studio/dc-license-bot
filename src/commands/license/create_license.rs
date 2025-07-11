@@ -30,10 +30,10 @@ pub async fn create_license(
     name: String,
 
     #[name_localized("zh-CN", "二传")]
-    #[description_localized("zh-CN", "是否允许二次传播")]
+    #[description_localized("zh-CN", "是否允许社区内二次传播")]
     redis: bool,
     #[name_localized("zh-CN", "二改")]
-    #[description_localized("zh-CN", "是否允许二次修改")]
+    #[description_localized("zh-CN", "是否允许社区内二次修改")]
     modify: bool,
     #[name_localized("zh-CN", "限制条件")]
     #[description_localized("zh-CN", "是否限制条件(可选)")]
