@@ -4,6 +4,12 @@ use serenity::all::*;
 
 use crate::error::BotError;
 use entities::user_licenses::Model as LicenseModel;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DefaultLicenseIdentifier {
+    User(i32),
+    System(String),
+}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SystemLicense {
     pub license_name: String,
