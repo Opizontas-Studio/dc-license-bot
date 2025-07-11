@@ -5,6 +5,45 @@ use entities::user_licenses::Model as UserLicense;
 pub struct LicenseEmbedBuilder;
 
 impl LicenseEmbedBuilder {
+    /// 格式化权限值
+    fn format_permission(allowed: bool) -> &'static str {
+        if allowed {
+            "✅ 允许"
+        } else {
+            "❌ 不允许"
+        }
+    }
+
+    /// 添加协议权限字段到embed
+    fn add_license_fields(
+        embed: CreateEmbed,
+        allow_redistribution: bool,
+        allow_modification: bool,
+        allow_backup: bool,
+        restrictions_note: Option<&str>,
+    ) -> CreateEmbed {
+        embed
+            .field(
+                "允许二次传播",
+                Self::format_permission(allow_redistribution),
+                true,
+            )
+            .field(
+                "允许二次修改",
+                Self::format_permission(allow_modification),
+                true,
+            )
+            .field(
+                "允许备份",
+                Self::format_permission(allow_backup),
+                true,
+            )
+            .field(
+                "限制条件",
+                restrictions_note.unwrap_or("无特殊限制"),
+                false,
+            )
+    }
     /// 创建协议管理主菜单embed
     pub fn create_license_manager_embed() -> CreateEmbed {
         CreateEmbed::new()
@@ -15,42 +54,18 @@ impl LicenseEmbedBuilder {
 
     /// 创建协议详情展示embed
     pub fn create_license_detail_embed(license: &UserLicense) -> CreateEmbed {
-        CreateEmbed::new()
+        let embed = CreateEmbed::new()
             .title(format!("📜 授权协议: {}", license.license_name))
             .description("本作品内容受以下授权协议保护：")
-            .colour(Colour::BLUE)
-            .field(
-                "允许二次传播",
-                if license.allow_redistribution {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许二次修改",
-                if license.allow_modification {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许备份",
-                if license.allow_backup {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "限制条件",
-                license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
-                false,
-            )
+            .colour(Colour::BLUE);
+        
+        Self::add_license_fields(
+            embed,
+            license.allow_redistribution,
+            license.allow_modification,
+            license.allow_backup,
+            license.restrictions_note.as_deref(),
+        )
     }
 
     /// 创建协议删除成功embed
@@ -69,42 +84,18 @@ impl LicenseEmbedBuilder {
         rest: Option<&str>,
         backup: Option<bool>,
     ) -> CreateEmbed {
-        CreateEmbed::new()
+        let embed = CreateEmbed::new()
             .title(format!("📜 授权协议: {}", name))
             .description("本作品内容受以下授权协议保护：")
-            .colour(Colour::BLUE)
-            .field(
-                "允许二次传播",
-                if redis {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许二次修改",
-                if modify {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许备份",
-                if backup.unwrap_or(false) {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "限制条件",
-                rest.unwrap_or("无特殊限制"),
-                false,
-            )
+            .colour(Colour::BLUE);
+        
+        Self::add_license_fields(
+            embed,
+            redis,
+            modify,
+            backup.unwrap_or(false),
+            rest,
+        )
     }
 
     /// 创建协议发布成功embed
@@ -142,44 +133,20 @@ impl LicenseEmbedBuilder {
         backup_allowed: bool,
         display_name: &str,
     ) -> CreateEmbed {
-        CreateEmbed::new()
+        let embed = CreateEmbed::new()
             .title("📜 授权协议")
             .description("本作品内容受以下授权协议保护：")
-            .field(
-                "允许二次传播",
-                if license.allow_redistribution {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许二次修改",
-                if license.allow_modification {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "允许备份",
-                if backup_allowed {
-                    "✅ 允许"
-                } else {
-                    "❌ 不允许"
-                },
-                true,
-            )
-            .field(
-                "限制条件",
-                license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
-                false,
-            )
-            .footer(CreateEmbedFooter::new(format!("作者: {}", display_name)))
-            .timestamp(Timestamp::now())
-            .colour(Colour::BLUE)
+            .colour(Colour::BLUE);
+        
+        Self::add_license_fields(
+            embed,
+            license.allow_redistribution,
+            license.allow_modification,
+            backup_allowed,
+            license.restrictions_note.as_deref(),
+        )
+        .footer(CreateEmbedFooter::new(format!("作者: {}", display_name)))
+        .timestamp(Timestamp::now())
     }
 
     /// 创建作废协议embed
