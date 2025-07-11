@@ -1,537 +1,247 @@
-# Discord Bot 开发指南
+# DC License Bot
 
-使用 Rust 构建 Discord 机器人的完整指南，基于 Serenity、Poise 和 Sea-ORM。
+[![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/)
 
-## 架构概览
+一个用 Rust 构建的 Discord 机器人，专门用于创作者作品的许可协议管理。机器人提供完整的许可协议声明、管理和自动发布功能，遵循**反商业化**原则。
 
-这个 Discord 机器人展示了现代 Rust 模式，用于构建可扩展、可维护的机器人，具有清晰的关注点分离。
+## ✨ 核心功能
 
-### 核心架构模式
+### 📝 许可协议管理
+- **创建自定义协议** - 用户可创建个性化的许可协议（限制5个）
+- **协议管理面板** - 查看、编辑、删除已创建的协议
+- **智能协议发布** - 在 Discord 帖子中应用许可协议
+- **权限验证** - 确保只有作品作者可以添加协议
 
-#### 1. **工作空间结构**
+### ⚡ 自动化功能
+- **自动发布设置** - 在指定论坛频道发帖时自动附加许可协议
+- **默认协议配置** - 设置常用的默认许可协议
+- **协议更新替换** - 自动废弃旧协议并发布新版本
+- **备份权限通知** - 集成外部备份服务，权限变更时自动通知
 
-```
-dog-bot/
-├── src/           # 主应用程序代码
-├── entities/      # 数据库实体定义（工作空间成员）
-├── migration/     # 数据库迁移（工作空间成员）
-└── Cargo.toml     # 工作空间配置
-```
+### 🛡️ 管理员功能
+- **系统信息监控** - 查看机器人运行状态和性能指标
+- **热重载系统授权** - 无需重启即可更新系统许可配置
+- **权限管理** - 基于配置文件的灵活权限控制
 
-**主要优势：**
+## 🏗️ 技术架构
 
-- 模块化代码组织
-- 数据库组件独立编译
-- 应用逻辑与数据层清晰分离
-
-#### 2. **分层架构**
-
+### 分层架构设计
 ```
 ┌─────────────────────────────────────────┐
-│              命令层 (Commands)           │  <- 用户交互的斜杠命令
+│            Commands Layer               │  ← Poise 斜杠命令框架
 ├─────────────────────────────────────────┤
-│              处理器层 (Handlers)         │  <- Discord 事件处理
+│            Handlers Layer               │  ← Discord 事件处理
+├─────────────────────────────────────────┤  
+│            Services Layer               │  ← 业务逻辑和数据访问
 ├─────────────────────────────────────────┤
-│              服务层 (Services)           │  <- 业务逻辑和数据访问
-├─────────────────────────────────────────┤
-│              数据库层 (Database)         │  <- ORM 实体和迁移
+│            Database Layer               │  ← Sea-ORM + SQLite
 └─────────────────────────────────────────┘
 ```
 
-**目录结构：**
-
-- `src/commands/` - 斜杠命令和用户交互
-- `src/handlers/` - Discord 事件处理器（消息、表情反应等）
-- `src/services/` - 业务逻辑和数据访问模式
-- `src/database.rs` - 数据库连接和实例管理
-
-#### 3. **通过 Context 进行依赖注入**
-
-```rust
-// 配置和数据库实例都通过 Context 传递
-pub struct BotData {
-    pub database: BotDatabase,
-    pub config: Config,
-}
-
-// 在 Poise 框架中使用
-type Context<'a> = poise::Context<'a, BotData, BotError>;
+### 工作空间结构
+```
+dc-license-bot/
+├── src/                    # 主应用代码
+│   ├── commands/           # 斜杠命令实现
+│   │   ├── license/        # 许可协议相关命令
+│   │   └── system.rs       # 系统管理命令
+│   ├── services/           # 业务服务层
+│   │   ├── license/        # 许可业务逻辑
+│   │   ├── notification_service.rs  # 外部通知
+│   │   ├── system_license.rs       # 系统许可缓存
+│   │   └── user_settings.rs        # 用户设置
+│   ├── handlers/           # Discord 事件处理
+│   ├── database.rs         # 数据库连接管理
+│   └── main.rs            # 应用入口
+├── entities/              # 数据库实体（工作空间成员）
+├── migration/             # 数据库迁移（工作空间成员）
+└── config.example.toml    # 配置模板
 ```
 
-**优势：**
+### 核心技术栈
+- **🦀 Rust** - 系统编程语言，高性能 + 内存安全
+- **🔌 Serenity + Poise** - Discord API 封装 + 命令框架  
+- **🗄️ Sea-ORM** - 现代异步 ORM，支持迁移
+- **📊 SQLite** - 嵌入式数据库，简化部署
+- **⚙️ Figment** - 灵活的配置管理（TOML + 环境变量）
+- **🔄 Tokio** - 异步运行时
+- **💾 Jemalloc** - 高性能内存分配器（减少60-80%内存使用）
 
-- 更灵活的依赖管理，便于测试
-- 避免全局状态的潜在问题
-- 更清晰的数据流和依赖关系
-- 配置和数据库都通过上下文传递，便于测试和模块化
+## 🚀 快速开始
 
-## 数据库架构
+### 环境要求
+- Rust 1.70+ 
+- Discord 应用程序和机器人令牌
 
-### 迁移优先开发
+### 安装与配置
 
-#### 1. **创建迁移文件**
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/Opizontas-Studio/dc-license-bot.git
+   cd dc-license-bot
+   ```
 
-```rust
-// migration/src/m20220101_000001_create_table.rs
-use sea_orm_migration::{prelude::*, schema::*};
+2. **配置机器人**
+   ```bash
+   cp config.example.toml config.toml
+   # 编辑 config.toml，填入你的 Discord 机器人令牌
+   ```
 
-#[derive(DeriveMigrationName)]
-pub struct Migration;
+3. **初始化数据库**
+   ```bash
+   cargo run --bin migration
+   ```
 
-#[async_trait::async_trait]
-impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .create_table(
-                Table::create()
-                    .table(Messages::Table)
-                    .if_not_exists()
-                    .col(big_unsigned_uniq(Messages::MessageId).primary_key())
-                    .col(big_unsigned(Messages::UserId).not_null())
-                    .col(big_unsigned(Messages::GuildId).not_null())
-                    .col(big_unsigned(Messages::ChannelId).not_null())
-                    .col(timestamp_with_time_zone(Messages::Timestamp))
-                    .to_owned(),
-            )
-            .await
-    }
+4. **运行机器人**
+   ```bash
+   cargo run -- -c config.toml -d ./data/bot.db -l ./system_licenses.json
+   ```
 
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_table(Table::drop().table(Messages::Table).to_owned())
-            .await
-    }
-}
-
-#[derive(DeriveIden)]
-enum Messages {
-    Table,
-    MessageId,
-    UserId,
-    GuildId,
-    ChannelId,
-    Timestamp,
-}
-```
-
-#### 2. **注册迁移**
-
-```rust
-// migration/src/lib.rs
-pub use sea_orm_migration::prelude::*;
-
-mod m20220101_000001_create_table;
-
-pub struct Migrator;
-
-#[async_trait::async_trait]
-impl MigratorTrait for Migrator {
-    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![
-            Box::new(m20220101_000001_create_table::Migration),
-        ]
-    }
-}
-```
-
-#### 3. **从数据库生成实体**
-
-**命令：**
-
-```bash
-# 首先运行迁移
-cargo run --bin migration
-
-# 从现有数据库生成实体
-sea-orm-cli generate entity \
-    --database-url "sqlite://sqlite.db" \
-    --output-dir entities/src/entities
-```
-
-**生成的实体：**
-
-```rust
-// entities/src/entities/messages.rs
-use sea_orm::entity::prelude::*;
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "messages")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub message_id: i64,
-    pub user_id: i64,
-    pub guild_id: i64,
-    pub channel_id: i64,
-    pub timestamp: DateTimeWithTimeZone,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
-
-impl ActiveModelBehavior for ActiveModel {}
-```
-
-#### 4. **服务层模式**
-
-```rust
-// src/services/messages.rs
-use entities::messages::*;
-use sea_orm::*;
-
-pub struct MessageService<'a> {
-    db: &'a BotDatabase,
-}
-
-impl<'a> MessageService<'a> {
-    pub fn new(db: &'a BotDatabase) -> Self {
-        Self { db }
-    }
-    
-    pub async fn record(&self, message_id: MessageId, user_id: UserId, ...) -> Result<(), BotError> {
-        let message = ActiveModel {
-            message_id: Set(message_id.get() as i64),
-            user_id: Set(user_id.get() as i64),
-            // ... 其他字段
-        };
-        
-        Entity::insert(message)
-            .on_conflict(OnConflict::column(Column::MessageId).do_nothing().to_owned())
-            .exec(self.db.inner())
-            .await?;
-        Ok(())
-    }
-}
-```
-
-**数据库访问模式：**
-
-```rust
-// 在处理器/命令中使用
-use crate::services::MessageService;
-
-async fn handle_message(ctx: &Context, msg: &Message, db: &BotDatabase) {
-    MessageService::new(db)
-        .record(msg.id, msg.author.id, msg.guild_id.unwrap(), msg.channel_id, msg.timestamp)
-        .await
-        .unwrap();
-}
-```
-
-## 框架集成
-
-### Poise 命令框架
-
-```rust
-// src/commands/system.rs
-use poise::Command;
-
-#[poise::command(slash_command)]
-pub async fn ping(ctx: Context<'_>) -> Result<(), BotError> {
-    ctx.say("Pong!").await?;
-    Ok(())
-}
-
-#[poise::command(slash_command)]
-pub async fn stats(ctx: Context<'_>) -> Result<(), BotError> {
-    // 通过 Context 访问数据库和配置
-    let database = &ctx.data().database;
-    let config = &ctx.data().config;
-    // 使用数据库和配置进行操作...
-    Ok(())
-}
-
-pub fn commands() -> Vec<Command<BotData, BotError>> {
-    vec![ping(), stats()]
-}
-```
-
-### 事件处理器模式
-
-```rust
-// src/handlers/active.rs
-use serenity::all::*;
-
-pub struct ActiveHandler;
-
-#[async_trait::async_trait]
-impl EventHandler for ActiveHandler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.author.bot {
-            return;
-        }
-        
-        // 记录消息活动
-        if let Some(guild_id) = msg.guild_id {
-            // 需要通过某种方式获取数据库实例，例如通过 Context 或参数传递
-            // MessageService::new(&database)
-            //     .record(msg.id, msg.author.id, guild_id, msg.channel_id, msg.timestamp)
-            //     .await
-            //     .unwrap_or_else(|e| tracing::error!("记录消息失败: {}", e));
-        }
-    }
-}
-```
-
-## 配置管理
-
-### 基于 Figment 的配置
-
-```rust
-// src/config.rs
-use figment::{Figment, providers::{Format, Json, Env}};
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Config {
-    pub token: String,
-    pub roles: RoleConfig,
-    pub tree_holes: HashMap<ChannelId, TreeHoleConfig>,
-}
-
-pub fn load_config() -> Result<Config, figment::Error> {
-    Figment::new()
-        .merge(Json::file("config.json"))
-        .merge(Env::prefixed("RUST_BOT_"))
-        .extract()
-}
-```
-
-## 内存优化：Jemalloc 的重要性
-
-### 为什么 Jemalloc 对 Discord 机器人至关重要
-
-Discord 机器人在处理大量消息、用户和服务器数据时，Serenity 的内置缓存系统会产生大量的内存分配和释放。**使用 Jemalloc 可以将内存占用降低 60-80%**，特别是对于长时间运行的机器人。
-
-### 配置 Jemalloc
-
+### 配置文件示例
 ```toml
-# Cargo.toml
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemalloc-ctl = { version = "0.6", features = ["stats", "use_std"] }
-tikv-jemallocator = "0.6"
+# Discord机器人令牌
+token = "YOUR_DISCORD_BOT_TOKEN"
+
+# 时区偏移
+time_offset = 7200
+
+# 管理员用户ID列表
+extra_admins_ids = [
+    123456789012345678
+]
+
+# 管理员角色ID列表  
+admin_role_ids = []
+
+# 备份服务配置
+backup_enabled = false
+endpoint = "http://127.0.0.1:8199"
 ```
 
-```rust
-// src/main.rs
-#[cfg(not(target_env = "msvc"))]
-use tikv_jemallocator::Jemalloc;
+## 📋 命令列表
 
-#[cfg(not(target_env = "msvc"))]
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
-```
+### 用户命令
+| 命令 | 中文名 | 描述 |
+|------|--------|------|
+| `/create_license` | `/创建协议` | 创建自定义许可协议 |
+| `/license_manager` | `/协议管理` | 管理现有的许可协议 |
+| `/publish_license` | `/发布协议` | 在帖子中发布许可协议 |
+| `/auto_publish_settings` | `/自动发布设置` | 配置自动发布功能 |
 
-**特别优化的场景：**
+### 管理员命令
+| 命令 | 中文名 | 描述 |
+|------|--------|------|
+| `/system_info` | `/系统信息` | 查看系统运行状态 |
+| `/reload_licenses` | `/重载系统授权` | 热重载系统许可配置 |
 
-- **缓存频繁更新**：用户状态变化、消息缓存
-- **长时间运行**：减少内存碎片化
-- **高并发处理**：多线程环境下的内存分配优化
+## 🗃️ 数据库结构
 
-## Discord Bot 开发推荐库
+### 用户许可表 (`user_licenses`)
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `id` | INTEGER | 许可ID（主键） |
+| `user_id` | BIGINT | 用户Discord ID |
+| `license_name` | TEXT | 许可协议名称 |
+| `allow_redistribution` | BOOLEAN | 是否允许二次传播 |
+| `allow_modification` | BOOLEAN | 是否允许二次改编 |
+| `restrictions_note` | TEXT | 限制说明（可选） |
+| `allow_backup` | BOOLEAN | 是否允许备份 |
+| `usage_count` | INTEGER | 使用次数统计 |
+| `created_at` | DATETIME | 创建时间 |
 
-### 核心框架
+### 用户设置表 (`user_settings`)
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `user_id` | BIGINT | 用户Discord ID（主键） |
+| `auto_publish_enabled` | BOOLEAN | 是否启用自动发布 |
+| `default_user_license_id` | INTEGER | 默认用户许可ID |
+| `default_system_license_name` | TEXT | 默认系统许可名称 |
 
-- **`serenity`** - Discord API 封装和事件处理
-- **`poise`** - 基于 Serenity 构建的命令框架
-- **`tokio`** - 支持多线程的异步运行时
+### 已发布帖子表 (`published_posts`)
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `thread_id` | BIGINT | 帖子线程ID（主键） |
+| `message_id` | BIGINT | 协议消息ID |
+| `user_id` | BIGINT | 发布者用户ID |
+| `backup_allowed` | BOOLEAN | 当前备份权限状态 |
+| `updated_at` | DATETIME | 最后更新时间 |
 
-### 数据库与 ORM
+## 🔧 开发指南
 
-- **`sea-orm`** - 现代异步 ORM，支持迁移
-- **`sea-orm-migration`** - 数据库迁移框架
-- **`sea-orm-cli`** - 代码生成工具
-
-### 配置与环境
-
-- **`figment`** - 灵活的配置管理（JSON + 环境变量）
-- **`clap`** - 命令行参数解析
-- **`serde`** - 序列化/反序列化
-
-### 性能与内存优化
-
-- **`tikv-jemallocator`** - 内存分配器优化（**强烈推荐**）
-- **`tikv-jemalloc-ctl`** - 内存统计和控制
-- **`arc-swap`** - 共享状态的原子引用计数
-- **`dashmap`** - 并发 HashMap 实现
-
-### 工具库
-
-- **`itertools`** - 迭代器工具和组合器
-- **`chrono`** - 日期和时间处理
-- **`rand`** - 随机数生成
-- **`futures`** - 异步编程工具
-
-### 开发与调试
-
-- **`tracing`** - 结构化日志和诊断
-- **`tracing-subscriber`** - 日志输出格式化和过滤
-- **`snafu`** - 错误处理和上下文管理
-
-### HTTP 与外部 API
-
-- **`reqwest`** - HTTP 客户端，用于外部 API 调用
-- **`serde_json`** - JSON 处理
-
-### 系统监控
-
-- **`sysinfo`** - 系统信息收集
-- **`owo-colors`** - 终端颜色输出
-
-## 开发工作流
-
-### 1. **数据库优先开发**
-
+### 本地开发
 ```bash
-# 创建新迁移
-sea-orm-cli migrate generate create_users_table
+# 检查代码
+cargo check
+
+# 运行测试
+cargo test
+
+# 代码格式化
+cargo fmt
+
+# 代码检查
+cargo clippy
+```
+
+### 数据库操作
+```bash
+# 创建新的迁移
+cargo run --bin migration generate <migration_name>
 
 # 应用迁移
 cargo run --bin migration
 
 # 重新生成实体
-sea-orm-cli generate entity --database-url "sqlite://sqlite.db" --output-dir entities/src/entities
+sea-orm-cli generate entity \
+    --database-url "sqlite://./data/bot.db" \
+    --output-dir entities/src/entities
 ```
 
-### 2. **命令开发**
-
+### Docker 部署
 ```bash
-# 快速语法检查
-cargo check
+# 构建镜像
+docker build -t dc-license-bot:latest .
 
-# 运行代码检查器
-cargo clippy
-
-# 格式化代码
-cargo fmt
-
-# 运行测试
-cargo test
+# 运行容器
+docker run -d \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v $(pwd)/data:/app/data \
+  dc-license-bot:latest
 ```
 
-### 3. **Docker 交叉编译开发**
+## 🔒 安全特性
 
-项目包含 Docker 配置用于 Linux 交叉编译，特别适用于在 macOS 上开发但需要部署到 Linux 服务器的场景。
+- **权限验证** - 只有帖子作者可以添加许可协议
+- **管理员控制** - 基于配置的管理员权限管理
+- **速率限制** - 防止命令滥用的冷却机制
+- **敏感信息保护** - 配置文件不包含在版本控制中
 
-```bash
-# 构建 Docker 镜像
-docker build -t dc-bot:latest .
+## 📈 性能优化
 
-# 启动开发容器
-docker-compose up -d
+- **Jemalloc 内存分配器** - 显著减少内存占用（60-80%优化）
+- **系统许可缓存** - 内存缓存提高响应速度
+- **异步架构** - 基于 Tokio 的高并发处理
+- **数据库连接池** - 优化数据库访问性能
 
-# 进入容器进行开发
-docker-compose exec dev bash
+## 🤝 贡献指南
 
-# 在容器内编译 Linux 版本
-cargo build --release --target x86_64-unknown-linux-gnu
-```
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
-**Docker 配置特点：**
+## 📄 许可证
 
-- 使用 `linux/amd64` 平台确保兼容性
-- 预安装所需的系统依赖（pkg-config、libfreetype6-dev 等）
-- 使用 `mold` 链接器加速编译
-- 持久化 cargo 缓存以提高构建速度
-- 配置 tmpfs 用于临时文件存储
+本项目采用反商业化原则。详见项目内的许可协议声明。
 
-### 4. **数据库测试**
+## 🙏 致谢
 
-```rust
-#[tokio::test]
-async fn test_message_service() {
-    let db = BotDatabase::new_memory().await.unwrap();
-    
-    // 为测试应用迁移
-    let migrations = Migrator::migrations();
-    let manager = SchemaManager::new(db.inner());
-    for migration in migrations {
-        migration.up(&manager).await.unwrap();
-    }
-    
-    // 测试服务逻辑
-    let service = MessageService::new(&db);
-    // ... 测试实现
-}
-```
+- [Serenity](https://github.com/serenity-rs/serenity) - Discord API 库
+- [Poise](https://github.com/serenity-rs/poise) - Discord 命令框架
+- [Sea-ORM](https://github.com/SeaQL/sea-orm) - Rust ORM 框架
 
-## 最佳实践
+---
 
-### 1. **错误处理**
-
-- 一致使用 `Result<T, E>`
-- 使用 `snafu` 实现合适的错误上下文
-- 在适当的级别记录错误
-
-### 2. **性能优化**
-
-- 使用 `LazyLock` 进行昂贵的初始化
-- 实现合适的数据库索引
-- **必须使用 Jemalloc** 来优化内存使用
-- 在高吞吐量场景下使用连接池
-
-### 3. **安全性**
-
-- 永远不要记录敏感数据（令牌、某些情况下的用户 ID）
-- 实现合适的基于角色的访问控制
-- 使用环境变量存储机密信息
-
-### 4. **代码组织**
-
-- 将关注点分离到不同的模块
-- 使用结构体而非 trait 来组织服务逻辑
-- 通过 Context 传递依赖而非全局变量
-- 实现全面的测试
-
-### 5. **内存管理**
-
-- 监控内存使用情况，特别是在缓存大量数据时
-- 定期清理不必要的缓存数据
-- 使用适当的数据结构来最小化内存占用
-
-### 6. **并发优化**
-
-对于需要处理大量异步操作的场景，**强烈推荐使用 `FuturesOrdered` 或 `FuturesUnordered`** 来并发化处理：
-
-```rust
-use futures::stream::{FuturesUnordered, StreamExt};
-
-// 并发处理多个异步操作
-async fn process_multiple_messages(messages: Vec<Message>) -> Vec<Result<(), Error>> {
-    let futures = messages
-        .into_iter()
-        .map(|msg| async move {
-            // 处理单个消息的异步操作
-            process_message(msg).await
-        })
-        .collect::<FuturesUnordered<_>>();
-    
-    futures.collect().await
-}
-
-// 对于需要保持顺序的场景
-use futures::stream::FuturesOrdered;
-
-async fn process_messages_ordered(messages: Vec<Message>) -> Vec<Result<(), Error>> {
-    let futures = messages
-        .into_iter()
-        .map(|msg| process_message(msg))
-        .collect::<FuturesOrdered<_>>();
-    
-    futures.collect().await
-}
-```
-
-**并发优化的关键场景：**
-
-- **批量数据库操作**：同时处理多个数据库查询
-- **外部 API 调用**：并发调用多个外部服务
-- **Discord API 操作**：批量发送消息、更新用户状态
-- **文件处理**：并发处理图片生成、文件上传
-
-**性能提升：**
-
-- 对于 I/O 密集型操作，并发处理可以带来 **3-10 倍** 的性能提升
-- 特别适用于处理大量 Discord 事件的机器人
-- 避免因单个慢操作阻塞整个事件处理流
-
-这种架构为构建可扩展的 Discord 机器人提供了坚实的基础，具有合适的关注点分离、可维护的代码结构和强大的数据持久化能力。通过使用 Jemalloc，可以显著减少内存占用，特别是对于处理大量 Discord 缓存数据的机器人。
+**DC License Bot** - 让创作者的权利得到尊重和保护 🛡️
