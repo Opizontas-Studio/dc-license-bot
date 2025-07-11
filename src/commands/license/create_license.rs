@@ -9,7 +9,7 @@ use crate::{error::BotError, utils::LicenseEmbedBuilder};
 #[name = "限制条件"]
 struct LicenseModal {
     #[name = "限制条件"]
-    #[placeholder = "输入限制条件，留空表示无限制"]
+    #[placeholder = "输入限制条件"]
     #[max_length = 1000]
     restrictions: String,
 }
