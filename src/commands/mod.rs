@@ -38,6 +38,16 @@ pub struct Data {
     notification_service: Arc<NotificationService>,
 }
 
+impl Data {
+    pub fn db(&self) -> &BotDatabase {
+        &self.db
+    }
+    
+    pub fn system_license_cache(&self) -> &Arc<SystemLicenseCache> {
+        &self.system_license_cache
+    }
+}
+
 async fn on_error(error: poise::FrameworkError<'_, Data, BotError>) {
     // This is our custom error handler
     // They are many errors that can occur, so we only handle the ones we want to customize
@@ -86,6 +96,11 @@ fn option(cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
                         .unwrap_or("DM".to_string())
                         .green()
                 )
+            })
+        },
+        event_handler: |ctx, event, framework, data| {
+            Box::pin(async move {
+                crate::handlers::poise_event_handler(ctx, event, framework, data).await
             })
         },
         ..Default::default()
