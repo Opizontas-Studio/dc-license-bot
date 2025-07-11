@@ -120,7 +120,10 @@ pub async fn publish_license(
     let backup_allowed = backup_override.unwrap_or(license.allow_backup);
 
     // 3. 生成预览embed
-    let preview_embed = create_license_embed(&license, backup_allowed, ctx.author());
+    let display_name = ctx.author_member().await
+        .map(|m| m.display_name().to_string())
+        .unwrap_or_else(|| ctx.author().name.clone());
+    let preview_embed = create_license_embed(&license, backup_allowed, ctx.author(), &display_name);
 
     // 创建按钮
     let publish_btn = CreateButton::new("publish_license")
@@ -204,7 +207,7 @@ pub async fn publish_license(
             }
 
             // 发布新协议
-            let license_embed = create_license_embed(&license, backup_allowed, ctx.author());
+            let license_embed = create_license_embed(&license, backup_allowed, ctx.author(), &display_name);
             let new_msg = thread
                 .send_message(ctx, CreateMessage::new().embed(license_embed))
                 .await?;
@@ -298,6 +301,7 @@ fn create_license_embed(
     license: &entities::entities::user_licenses::Model,
     backup_allowed: bool,
     author: &User,
+    display_name: &str,
 ) -> CreateEmbed {
     CreateEmbed::new()
         .title(format!("📜 授权协议: {}", license.license_name))
@@ -334,7 +338,7 @@ fn create_license_embed(
             license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
             false,
         )
-        .footer(CreateEmbedFooter::new(format!("发布者: <@{}>", author.id)))
+        .footer(CreateEmbedFooter::new(format!("发布者: {}", display_name)))
         .timestamp(serenity::model::Timestamp::now())
         .colour(Colour::BLUE)
 }
