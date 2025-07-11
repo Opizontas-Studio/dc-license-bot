@@ -6,7 +6,11 @@ use super::super::Context;
 use crate::{error::BotError, utils::LicenseEmbedBuilder};
 
 #[derive(Modal)]
+#[name = "限制条件"]
 struct LicenseModal {
+    #[name = "限制条件"]
+    #[placeholder = "输入限制条件，留空表示无限制"]
+    #[max_length = 1000]
     restrictions: String,
 }
 
