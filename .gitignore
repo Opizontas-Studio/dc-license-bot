@@ -7,3 +7,4 @@ sqlite.*
 .vscode
 CLAUDE.md
 data/
+docs/
