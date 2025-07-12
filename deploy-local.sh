@@ -43,6 +43,14 @@ cargo build --release
 
 print_success "Build completed"
 
+print_step "Ensuring data directory exists..."
+mkdir -p ./data
+
+print_step "Running database migrations..."
+DATABASE_URL="sqlite://$CURRENT_DIR/data/bot.db" cargo run -p migration
+
+print_success "Database initialized"
+
 print_step "Creating systemd service..."
 
 sudo tee /etc/systemd/system/$SERVICE_NAME.service > /dev/null <<EOF
