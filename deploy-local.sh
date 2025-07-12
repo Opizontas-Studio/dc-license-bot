@@ -111,13 +111,16 @@ mkdir -p "$DEPLOY_PATH/data"
 
 print_success "Files deployed to $DEPLOY_PATH"
 
-# Step 4: Run database migration
-print_step "Running database migration..."
+# Step 4: Initialize and migrate database
+print_step "Initializing database..."
 cd "$DEPLOY_PATH"
+
+# Run database migration
 if ./migration-bin; then
     print_success "Database migration completed"
 else
-    print_warning "Migration failed or already up to date"
+    print_error "Database migration failed"
+    exit 1
 fi
 cd - > /dev/null
 
