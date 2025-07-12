@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Local deployment script for dc-license-bot
-# Installs as systemd service on the current machine
+# Local deployment script for dc-bot
+# Builds and runs as systemd service on current machine
 
 set -e # Exit on any error
 
 # Configuration
 BINARY_NAME="dc-bot"
-SERVICE_NAME="dc-license-bot"
-SERVICE_USER="$USER" # Use current user
-DEPLOY_PATH="$HOME/dc-license-bot" # Deploy to user's home directory
+SERVICE_NAME="dc-bot"
+SERVICE_USER="$USER"
+DEPLOY_PATH="$HOME/dc-bot"
 
 # Colors for output
 RED='\033[0;31m'
@@ -19,19 +19,15 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 print_step() {
-    printf "${BLUE}[STEP]${NC} %s\n" "$1"
+    echo -e "${BLUE}[STEP]${NC} $1"
 }
 
 print_success() {
-    printf "${GREEN}[SUCCESS]${NC} %s\n" "$1"
-}
-
-print_warning() {
-    printf "${YELLOW}[WARNING]${NC} %s\n" "$1"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
 print_error() {
-    printf "${RED}[ERROR]${NC} %s\n" "$1"
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
 # Check if we're in the right directory
@@ -49,11 +45,6 @@ else
     exit 1
 fi
 
-# Strip binary to reduce size
-print_step "Stripping binary to reduce size..."
-strip target/release/${BINARY_NAME}
-strip target/release/migration
-
 # Check if binaries exist
 BINARY_PATH="target/release/${BINARY_NAME}"
 MIGRATION_BINARY_PATH="target/release/migration"
@@ -67,56 +58,39 @@ if [ ! -f "$MIGRATION_BINARY_PATH" ]; then
     exit 1
 fi
 
-# Show binary size
-BINARY_SIZE=$(du -h "$BINARY_PATH" | cut -f1)
-print_success "Binary built: $BINARY_SIZE"
+print_success "Binary found at $BINARY_PATH"
+print_success "Migration binary found at $MIGRATION_BINARY_PATH"
 
 # Step 2: Stop existing systemd service if running
-print_step "Checking for existing service..."
-if systemctl is-active --quiet $SERVICE_NAME 2>/dev/null; then
-    print_step "Stopping existing service..."
-    sudo systemctl stop $SERVICE_NAME
-    print_success "Service stopped"
+print_step "Stopping existing systemd service '$SERVICE_NAME'..."
+if sudo systemctl stop $SERVICE_NAME 2>/dev/null; then
+    print_success "Existing service stopped"
+else
+    echo "Service was not running or doesn't exist yet"
 fi
 
-# Step 3: Create deployment directory
+# Step 3: Upload binaries to deployment path
 print_step "Setting up deployment directory at $DEPLOY_PATH..."
 mkdir -p "$DEPLOY_PATH"
+cp "$BINARY_PATH" "$MIGRATION_BINARY_PATH" "$DEPLOY_PATH/"
+chmod +x "$DEPLOY_PATH/$BINARY_NAME" "$DEPLOY_PATH/migration"
+print_success "Binaries deployed to $DEPLOY_PATH"
 
-# Copy binaries (with different names to avoid conflicts with source directories)
-cp "$BINARY_PATH" "$DEPLOY_PATH/$BINARY_NAME"
-cp "$MIGRATION_BINARY_PATH" "$DEPLOY_PATH/migration-bin"
-chmod +x "$DEPLOY_PATH/$BINARY_NAME" "$DEPLOY_PATH/migration-bin"
-
-# Copy configuration files
+# Step 4: Copy config files
 if [ -f "config.toml" ]; then
     cp "config.toml" "$DEPLOY_PATH/"
-    print_success "Copied config.toml"
-else
-    print_error "config.toml not found!"
-    echo "Please create config.toml from config.example.toml and configure your Discord token"
-    exit 1
+    print_success "Config copied"
 fi
 
 if [ -f "system_licenses.json" ]; then
     cp "system_licenses.json" "$DEPLOY_PATH/"
-    print_success "Copied system_licenses.json"
-else
-    print_error "system_licenses.json not found!"
-    exit 1
+    print_success "System licenses copied"
 fi
 
-# Create data directory
-mkdir -p "$DEPLOY_PATH/data"
-
-print_success "Files deployed to $DEPLOY_PATH"
-
-# Step 4: Initialize and migrate database
-print_step "Initializing database..."
+# Step 5: Run migration
+print_step "Running database migration..."
 cd "$DEPLOY_PATH"
-
-# Run database migration
-if ./migration-bin; then
+if ./migration; then
     print_success "Database migration completed"
 else
     print_error "Database migration failed"
@@ -124,100 +98,88 @@ else
 fi
 cd - > /dev/null
 
-# Step 5: Create systemd service file
+# Step 6: Create systemd service file
 print_step "Creating systemd service file..."
 SERVICE_FILE_CONTENT="[Unit]
-Description=DC License Bot - Discord License Management Bot
-Documentation=https://github.com/Opizontas-Studio/dc-license-bot
+Description=Discord Bot Service
 After=network.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=$SERVICE_USER
-Group=$SERVICE_USER
-WorkingDirectory=$DEPLOY_PATH
-
-# Start command
-ExecStart=$DEPLOY_PATH/$BINARY_NAME -c $DEPLOY_PATH/config.toml -d $DEPLOY_PATH/data/bot.db -l $DEPLOY_PATH/system_licenses.json
-
-# Restart configuration
+ExecStart=${DEPLOY_PATH}/${BINARY_NAME} -c ${DEPLOY_PATH}/config.toml -d ${DEPLOY_PATH}/bot.db -l ${DEPLOY_PATH}/system_licenses.json
 Restart=always
 RestartSec=10
-StartLimitInterval=600
-StartLimitBurst=5
-
-# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=$SERVICE_NAME
 
 # Environment variables
-Environment=\"RUST_LOG=info\"
-Environment=\"RUST_BACKTRACE=1\"
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
 
-# Security hardening
+# Security settings
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=$DEPLOY_PATH/data
-
-# Resource limits (optional, adjust as needed)
-# MemoryLimit=512M
-# CPUQuota=50%
+ProtectHome=read-only
+ReadWritePaths=${DEPLOY_PATH}
 
 [Install]
 WantedBy=multi-user.target"
 
-# Write service file
+# Upload service file
 echo "$SERVICE_FILE_CONTENT" | sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null
-print_success "Service file created at /etc/systemd/system/${SERVICE_NAME}.service"
+print_success "Service file created"
 
-# Step 6: Reload systemd and enable service
-print_step "Configuring systemd..."
+# Step 7: Reload systemd and enable service
+print_step "Reloading systemd daemon..."
 sudo systemctl daemon-reload
-sudo systemctl enable $SERVICE_NAME
-print_success "Service enabled for auto-start on boot"
+print_success "Systemd daemon reloaded"
 
-# Step 7: Start the service
-print_step "Starting service..."
+print_step "Enabling service to start on boot..."
+sudo systemctl enable $SERVICE_NAME
+print_success "Service enabled for auto-start"
+
+# Step 8: Start the service
+print_step "Starting service '$SERVICE_NAME'..."
 if sudo systemctl start $SERVICE_NAME; then
-    print_success "Service started successfully"
+    print_success "Service started"
 else
     print_error "Failed to start service"
     sudo journalctl -u $SERVICE_NAME --no-pager -n 50
     exit 1
 fi
 
-# Step 8: Verify service is running
-sleep 2
-if systemctl is-active --quiet $SERVICE_NAME; then
-    print_success "Service is running!"
+# Step 9: Verify the service is running
+print_step "Verifying service status..."
+sleep 3
+
+SERVICE_STATUS=$(sudo systemctl is-active $SERVICE_NAME 2>/dev/null || echo "failed")
+
+if [ "$SERVICE_STATUS" = "active" ]; then
+    print_success "Service '$SERVICE_NAME' is running successfully"
+    
+    # Show service status
+    print_step "Service status:"
+    sudo systemctl status $SERVICE_NAME --no-pager -l
     
     echo ""
-    sudo systemctl status $SERVICE_NAME --no-pager
-    
+    echo -e "${GREEN}Deployment completed successfully!${NC}"
     echo ""
-    printf "${GREEN}═══════════════════════════════════════════════════════════${NC}\n"
-    printf "${GREEN}Deployment completed successfully!${NC}\n"
-    printf "${GREEN}═══════════════════════════════════════════════════════════${NC}\n"
+    echo -e "${YELLOW}Useful commands:${NC}"
+    echo -e "View status:      ${BLUE}sudo systemctl status $SERVICE_NAME${NC}"
+    echo -e "View logs:        ${BLUE}sudo journalctl -u $SERVICE_NAME -f --output cat${NC}"
+    echo -e "Stop service:     ${BLUE}sudo systemctl stop $SERVICE_NAME${NC}"
+    echo -e "Start service:    ${BLUE}sudo systemctl start $SERVICE_NAME${NC}"
+    echo -e "Restart service:  ${BLUE}sudo systemctl restart $SERVICE_NAME${NC}"
     echo ""
-    printf "${YELLOW}📋 Service Management Commands:${NC}\n"
-    printf "  Status:  ${BLUE}sudo systemctl status $SERVICE_NAME${NC}\n"
-    printf "  Logs:    ${BLUE}sudo journalctl -u $SERVICE_NAME -f${NC}\n"
-    printf "  Restart: ${BLUE}sudo systemctl restart $SERVICE_NAME${NC}\n"
-    printf "  Stop:    ${BLUE}sudo systemctl stop $SERVICE_NAME${NC}\n"
-    echo ""
-    printf "${YELLOW}🔄 Update Workflow:${NC}\n"
-    printf "  1. ${BLUE}git pull${NC}                    # Pull latest changes\n"
-    printf "  2. ${BLUE}./deploy-local.sh${NC}          # Redeploy\n"
-    echo ""
-    printf "${YELLOW}📁 Deployment Location:${NC}\n"
-    printf "  ${BLUE}$DEPLOY_PATH${NC}\n"
-    echo ""
+    echo -e "${YELLOW}Migration commands:${NC}"
+    echo -e "Run migration:    ${BLUE}cd $DEPLOY_PATH && ./migration${NC}"
 else
-    print_error "Service is not running!"
-    echo "Check logs with: sudo journalctl -u $SERVICE_NAME -n 100"
+    print_error "Service failed to start or is not running"
+    print_step "Checking service logs for errors..."
+    sudo journalctl -u $SERVICE_NAME --no-pager -l
     exit 1
 fi
