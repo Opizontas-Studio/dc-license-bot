@@ -1,7 +1,6 @@
+use entities::user_licenses::Model as LicenseModel;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
-
-use entities::user_licenses::Model as LicenseModel;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DefaultLicenseIdentifier {

@@ -1,12 +1,12 @@
+use std::sync::Arc;
+
 use arc_swap::ArcSwap;
 use reqwest::Client;
 use serde::Serialize;
 use snafu::ResultExt;
-use std::sync::Arc;
 use tracing;
 
-use crate::config::BotCfg;
-use crate::error::BotError;
+use crate::{config::BotCfg, error::BotError};
 
 #[derive(Serialize, Debug)]
 pub struct NotificationPayload {

@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
                             .name("fk_user_settings_default_user_license")
                             .from(UserSettings::Table, UserSettings::DefaultUserLicenseId)
                             .to(UserLicenses::Table, UserLicenses::Id)
-                            .on_delete(ForeignKeyAction::SetNull)
+                            .on_delete(ForeignKeyAction::SetNull),
                     )
                     .to_owned(),
             )
@@ -66,11 +66,11 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(Table::drop().table(PublishedPosts::Table).to_owned())
             .await?;
-        
+
         manager
             .drop_table(Table::drop().table(UserSettings::Table).to_owned())
             .await?;
-        
+
         manager
             .drop_table(Table::drop().table(UserLicenses::Table).to_owned())
             .await

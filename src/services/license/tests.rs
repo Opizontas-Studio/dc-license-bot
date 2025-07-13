@@ -1,7 +1,8 @@
-#[cfg(test)]
-use crate::database::BotDatabase;
 use migration::{Migrator, MigratorTrait, SchemaManager};
 use serenity::all::*;
+
+#[cfg(test)]
+use crate::database::BotDatabase;
 
 async fn setup_test_db() -> BotDatabase {
     let db = BotDatabase::new_memory().await.unwrap();

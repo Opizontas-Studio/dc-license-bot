@@ -4,8 +4,13 @@ use arc_swap::ArcSwap;
 use chrono::{FixedOffset, Utc};
 use clap::Parser;
 use dc_bot::{
-    Args, commands::framework, config::BotCfg, database::BotDatabase, error::BotError, handlers::*,
-    services::{system_license::SystemLicenseCache, notification_service::NotificationService},
+    Args,
+    commands::framework,
+    config::BotCfg,
+    database::BotDatabase,
+    error::BotError,
+    handlers::*,
+    services::{notification_service::NotificationService, system_license::SystemLicenseCache},
 };
 use serenity::{Client, all::GatewayIntents};
 use tracing_subscriber::{
@@ -47,10 +52,10 @@ async fn main() -> Result<(), BotError> {
 
     let db = BotDatabase::new(&Args::parse().db).await?;
     let cfg = Arc::new(ArcSwap::from_pointee(cfg));
-    
+
     // Initialize system license cache
     let system_license_cache = Arc::new(
-        SystemLicenseCache::new(std::path::Path::new(&Args::parse().default_licenses)).await?
+        SystemLicenseCache::new(std::path::Path::new(&Args::parse().default_licenses)).await?,
     );
 
     // Initialize notification service
@@ -68,7 +73,12 @@ async fn main() -> Result<(), BotError> {
         .type_map_insert::<BotDatabase>(db.to_owned())
         .type_map_insert::<BotCfg>(cfg.to_owned())
         .event_handler(PingHandler)
-        .framework(framework(db, cfg, system_license_cache, notification_service))
+        .framework(framework(
+            db,
+            cfg,
+            system_license_cache,
+            notification_service,
+        ))
         .await?;
 
     // Finally, start a single shard, and start listening to events.

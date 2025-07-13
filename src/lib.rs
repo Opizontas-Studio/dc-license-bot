@@ -8,8 +8,8 @@ pub mod database;
 pub mod error;
 pub mod handlers;
 pub mod services;
-pub mod utils;
 pub mod types;
+pub mod utils;
 
 #[derive(Parser)]
 pub struct Args {

@@ -2,9 +2,9 @@ mod auto_publish;
 mod ping;
 
 pub use ping::PingHandler;
+use serenity::all::{Channel, ChannelType, Context, FullEvent};
 
 use crate::{commands::Data, error::BotError};
-use serenity::all::{Channel, ChannelType, Context, FullEvent};
 
 pub async fn poise_event_handler(
     ctx: &Context,

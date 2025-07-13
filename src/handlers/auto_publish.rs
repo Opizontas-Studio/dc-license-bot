@@ -1,16 +1,16 @@
-use crate::{
-    commands::Data, error::BotError, services::license::LicensePublishService,
-    types::license::DefaultLicenseIdentifier,
-};
+use std::{collections::HashMap, sync::OnceLock, time::Instant};
+
 use serenity::all::{
     ButtonStyle, ChannelId, Colour, Context, CreateActionRow, CreateButton, CreateEmbed,
     CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
     GuildChannel, Timestamp,
 };
-use std::collections::HashMap;
-use std::sync::OnceLock;
-use std::time::Instant;
 use tokio::sync::RwLock;
+
+use crate::{
+    commands::Data, error::BotError, services::license::LicensePublishService,
+    types::license::DefaultLicenseIdentifier,
+};
 
 // 线程创建事件去重缓存，存储最近处理过的线程ID和处理时间
 static PROCESSED_THREADS: OnceLock<RwLock<HashMap<u64, Instant>>> = OnceLock::new();

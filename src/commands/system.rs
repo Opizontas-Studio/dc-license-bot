@@ -156,7 +156,7 @@ pub async fn guilds_info(ctx: Context<'_>) -> Result<(), BotError> {
 /// Reload system licenses from the configuration file
 pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
     let system_license_cache = ctx.data().system_license_cache();
-    
+
     match system_license_cache.reload().await {
         Ok(()) => {
             ctx.say("✅ 系统授权已成功从文件刷新。").await?;
@@ -166,6 +166,6 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
                 .await?;
         }
     }
-    
+
     Ok(())
 }

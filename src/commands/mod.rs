@@ -1,10 +1,10 @@
 // mod cookie;
 mod license;
 mod system;
-use license::*;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
+use license::*;
 // use cookie::*;
 use owo_colors::OwoColorize;
 use poise::command;
@@ -12,7 +12,12 @@ use snafu::OptionExt;
 use system::*;
 use tracing::{error, info};
 
-use crate::{config::BotCfg, database::BotDatabase, error::BotError, services::{system_license::SystemLicenseCache, notification_service::NotificationService}};
+use crate::{
+    config::BotCfg,
+    database::BotDatabase,
+    error::BotError,
+    services::{notification_service::NotificationService, system_license::SystemLicenseCache},
+};
 
 pub type Context<'a> = poise::Context<'a, Data, BotError>;
 
@@ -42,11 +47,11 @@ impl Data {
     pub fn db(&self) -> &BotDatabase {
         &self.db
     }
-    
+
     pub fn system_license_cache(&self) -> &Arc<SystemLicenseCache> {
         &self.system_license_cache
     }
-    
+
     pub fn notification_service(&self) -> &Arc<NotificationService> {
         &self.notification_service
     }
@@ -112,14 +117,24 @@ fn option(_cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
     }
 }
 
-pub fn framework(db: BotDatabase, cfg: Arc<ArcSwap<BotCfg>>, system_license_cache: Arc<SystemLicenseCache>, notification_service: Arc<NotificationService>) -> poise::Framework<Data, BotError> {
+pub fn framework(
+    db: BotDatabase,
+    cfg: Arc<ArcSwap<BotCfg>>,
+    system_license_cache: Arc<SystemLicenseCache>,
+    notification_service: Arc<NotificationService>,
+) -> poise::Framework<Data, BotError> {
     poise::Framework::builder()
         .options(option(&cfg))
         .setup(|_, _, _| {
             Box::pin(async move {
                 // This is run when the framework is set up
                 info!("Framework has been set up!");
-                Ok(Data { db, cfg, system_license_cache, notification_service })
+                Ok(Data {
+                    db,
+                    cfg,
+                    system_license_cache,
+                    notification_service,
+                })
             })
         })
         .build()

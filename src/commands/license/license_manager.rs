@@ -174,7 +174,9 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                 .edit(
                     ctx,
                     CreateReply::default()
-                        .embed(LicenseEmbedBuilder::create_license_deleted_embed(&license.license_name))
+                        .embed(LicenseEmbedBuilder::create_license_deleted_embed(
+                            &license.license_name,
+                        ))
                         .components(vec![]),
                 )
                 .await?;

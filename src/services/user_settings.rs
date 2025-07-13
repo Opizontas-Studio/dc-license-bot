@@ -1,5 +1,5 @@
 use entities::user_settings::*;
-use sea_orm::{prelude::*, Set};
+use sea_orm::{Set, prelude::*};
 use serenity::all::*;
 
 use crate::{database::BotDatabase, error::BotError, types::license::DefaultLicenseIdentifier};
@@ -19,7 +19,7 @@ impl UserSettingsService<'_> {
     /// Get user settings, create default if not exists
     pub async fn get_or_create(&self, user_id: UserId) -> Result<UserSettings, BotError> {
         let user_id_i64 = user_id.get() as i64;
-        
+
         if let Some(settings) = Entity::find()
             .filter(Column::UserId.eq(user_id_i64))
             .one(self.0.inner())
@@ -34,7 +34,7 @@ impl UserSettingsService<'_> {
                 default_user_license_id: Set(None),
                 default_system_license_name: Set(None),
             };
-            
+
             let created = default_settings.insert(self.0.inner()).await?;
             Ok(created)
         }
@@ -57,7 +57,7 @@ impl UserSettingsService<'_> {
         let settings = self.get_or_create(user_id).await?;
         let mut active_settings: ActiveModel = settings.into();
         active_settings.auto_publish_enabled = Set(enabled);
-        
+
         let updated = active_settings.update(self.0.inner()).await?;
         Ok(updated)
     }
@@ -70,7 +70,7 @@ impl UserSettingsService<'_> {
     ) -> Result<UserSettings, BotError> {
         let settings = self.get_or_create(user_id).await?;
         let mut active_settings: ActiveModel = settings.into();
-        
+
         match license {
             Some(DefaultLicenseIdentifier::User(id)) => {
                 active_settings.default_user_license_id = Set(Some(id));
@@ -85,7 +85,7 @@ impl UserSettingsService<'_> {
                 active_settings.default_system_license_name = Set(None);
             }
         }
-        
+
         let updated = active_settings.update(self.0.inner()).await?;
         Ok(updated)
     }
@@ -94,10 +94,10 @@ impl UserSettingsService<'_> {
     pub async fn toggle_auto_publish(&self, user_id: UserId) -> Result<UserSettings, BotError> {
         let settings = self.get_or_create(user_id).await?;
         let new_enabled = !settings.auto_publish_enabled;
-        
+
         let mut active_settings: ActiveModel = settings.into();
         active_settings.auto_publish_enabled = Set(new_enabled);
-        
+
         let updated = active_settings.update(self.0.inner()).await?;
         Ok(updated)
     }
@@ -109,9 +109,12 @@ impl UserSettingsService<'_> {
     }
 
     /// Get default license for user
-    pub async fn get_default_license(&self, user_id: UserId) -> Result<Option<DefaultLicenseIdentifier>, BotError> {
+    pub async fn get_default_license(
+        &self,
+        user_id: UserId,
+    ) -> Result<Option<DefaultLicenseIdentifier>, BotError> {
         let settings = self.get_or_create(user_id).await?;
-        
+
         if let Some(user_license_id) = settings.default_user_license_id {
             Ok(Some(DefaultLicenseIdentifier::User(user_license_id)))
         } else if let Some(system_license_name) = settings.default_system_license_name {
@@ -132,7 +135,7 @@ impl UserSettingsService<'_> {
             .filter(Column::UserId.eq(user_id.get() as i64))
             .exec(self.0.inner())
             .await?;
-        
+
         Ok(result.rows_affected > 0)
     }
 
@@ -142,7 +145,7 @@ impl UserSettingsService<'_> {
             .filter(Column::AutoPublishEnabled.eq(true))
             .all(self.0.inner())
             .await?;
-        
+
         Ok(settings
             .into_iter()
             .map(|s| UserId::new(s.user_id as u64))
@@ -166,11 +169,11 @@ impl UserSettingsService<'_> {
     ) -> Result<UserSettings, BotError> {
         let settings = self.get_or_create(user_id).await?;
         let mut active_settings: ActiveModel = settings.into();
-        
+
         if let Some(enabled) = auto_publish_enabled {
             active_settings.auto_publish_enabled = Set(enabled);
         }
-        
+
         if let Some(license) = default_license {
             match license {
                 Some(DefaultLicenseIdentifier::User(id)) => {
@@ -187,7 +190,7 @@ impl UserSettingsService<'_> {
                 }
             }
         }
-        
+
         let updated = active_settings.update(self.0.inner()).await?;
         Ok(updated)
     }
@@ -195,10 +198,10 @@ impl UserSettingsService<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::database::BotDatabase;
-    use crate::types::license::DefaultLicenseIdentifier;
     use migration::{Migrator, MigratorTrait, SchemaManager};
+
+    use super::*;
+    use crate::{database::BotDatabase, types::license::DefaultLicenseIdentifier};
 
     async fn setup_test_db() -> BotDatabase {
         let db = BotDatabase::new_memory().await.unwrap();
@@ -247,15 +250,40 @@ mod tests {
         let service = db.user_settings();
         let user_id = UserId::new(123);
 
+        for _ in 0..43 {
+            db.license()
+                .create(
+                    user_id,
+                    "Test License".to_string(),
+                    true,
+                    false,
+                    None,
+                    false,
+                )
+                .await
+                .unwrap();
+        }
         // Test setting user license
-        let settings = service.set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42))).await.unwrap();
+        let settings = service
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)))
+            .await
+            .unwrap();
         assert_eq!(settings.default_user_license_id, Some(42));
         assert_eq!(settings.default_system_license_name, None);
 
         // Test setting system license
-        let settings = service.set_default_license(user_id, Some(DefaultLicenseIdentifier::System("MIT".to_string()))).await.unwrap();
+        let settings = service
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::System("MIT".to_string())),
+            )
+            .await
+            .unwrap();
         assert_eq!(settings.default_user_license_id, None);
-        assert_eq!(settings.default_system_license_name, Some("MIT".to_string()));
+        assert_eq!(
+            settings.default_system_license_name,
+            Some("MIT".to_string())
+        );
 
         // Test clearing license
         let settings = service.set_default_license(user_id, None).await.unwrap();
@@ -306,12 +334,40 @@ mod tests {
         assert_eq!(service.get_default_license(user_id).await.unwrap(), None);
 
         // Set to user license
-        service.set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42))).await.unwrap();
-        assert_eq!(service.get_default_license(user_id).await.unwrap(), Some(DefaultLicenseIdentifier::User(42)));
+        for _ in 0..43 {
+            db.license()
+                .create(
+                    user_id,
+                    "Test License".to_string(),
+                    true,
+                    false,
+                    None,
+                    false,
+                )
+                .await
+                .unwrap();
+        }
+        service
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)))
+            .await
+            .unwrap();
+        assert_eq!(
+            service.get_default_license(user_id).await.unwrap(),
+            Some(DefaultLicenseIdentifier::User(42))
+        );
 
         // Set to system license
-        service.set_default_license(user_id, Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string()))).await.unwrap();
-        assert_eq!(service.get_default_license(user_id).await.unwrap(), Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string())));
+        service
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string())),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            service.get_default_license(user_id).await.unwrap(),
+            Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string()))
+        );
     }
 
     #[tokio::test]

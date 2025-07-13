@@ -1,9 +1,11 @@
-use crate::{error::BotError, types::license::SystemLicense};
-use arc_swap::ArcSwap;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use arc_swap::ArcSwap;
+
+use crate::{error::BotError, types::license::SystemLicense};
 
 #[derive(Debug)]
 pub struct SystemLicenseCache {

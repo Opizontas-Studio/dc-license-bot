@@ -1,6 +1,6 @@
 use chrono::Utc;
 use entities::published_posts::*;
-use sea_orm::{prelude::*, QueryOrder, QuerySelect, Set};
+use sea_orm::{QueryOrder, QuerySelect, Set, prelude::*};
 use serenity::all::*;
 
 use crate::{database::BotDatabase, error::BotError};
@@ -114,11 +114,7 @@ impl PublishedPostsService<'_> {
         to: chrono::DateTime<Utc>,
     ) -> Result<Vec<PublishedPost>, BotError> {
         Ok(Entity::find()
-            .filter(
-                Column::UpdatedAt
-                    .gte(from)
-                    .and(Column::UpdatedAt.lt(to)),
-            )
+            .filter(Column::UpdatedAt.gte(from).and(Column::UpdatedAt.lt(to)))
             .order_by_desc(Column::UpdatedAt)
             .all(self.0.inner())
             .await?)
@@ -250,10 +246,11 @@ impl PublishedPostsService<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::database::BotDatabase;
     use chrono::Duration;
     use migration::{Migrator, MigratorTrait, SchemaManager};
+
+    use super::*;
+    use crate::database::BotDatabase;
 
     async fn setup_test_db() -> BotDatabase {
         let db = BotDatabase::new_memory().await.unwrap();
@@ -447,14 +444,18 @@ mod tests {
         let user_id = UserId::new(789);
 
         // For non-existing post, should return true if backup is allowed
-        assert!(service
-            .has_backup_permission_changed(thread_id, true)
-            .await
-            .unwrap());
-        assert!(!service
-            .has_backup_permission_changed(thread_id, false)
-            .await
-            .unwrap());
+        assert!(
+            service
+                .has_backup_permission_changed(thread_id, true)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !service
+                .has_backup_permission_changed(thread_id, false)
+                .await
+                .unwrap()
+        );
 
         // Record post with backup allowed
         service
@@ -463,16 +464,20 @@ mod tests {
             .unwrap();
 
         // Same permission should return false
-        assert!(!service
-            .has_backup_permission_changed(thread_id, true)
-            .await
-            .unwrap());
+        assert!(
+            !service
+                .has_backup_permission_changed(thread_id, true)
+                .await
+                .unwrap()
+        );
 
         // Different permission should return true
-        assert!(service
-            .has_backup_permission_changed(thread_id, false)
-            .await
-            .unwrap());
+        assert!(
+            service
+                .has_backup_permission_changed(thread_id, false)
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]

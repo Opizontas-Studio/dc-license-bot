@@ -1,5 +1,5 @@
-use serenity::all::{Colour, CreateEmbed, CreateEmbedFooter, Timestamp};
 use entities::user_licenses::Model as UserLicense;
+use serenity::all::{Colour, CreateEmbed, CreateEmbedFooter, Timestamp};
 
 /// 协议相关的嵌入消息构建工具
 pub struct LicenseEmbedBuilder;
@@ -33,21 +33,9 @@ impl LicenseEmbedBuilder {
                 Self::format_permission(allow_modification),
                 true,
             )
-            .field(
-                "管理组备份",
-                Self::format_permission(allow_backup),
-                true,
-            )
-            .field(
-                "商业化使用",
-                Self::format_permission(false),
-                true,
-            )
-            .field(
-                "限制条件",
-                restrictions_note.unwrap_or("无特殊限制"),
-                false,
-            )
+            .field("管理组备份", Self::format_permission(allow_backup), true)
+            .field("商业化使用", Self::format_permission(false), true)
+            .field("限制条件", restrictions_note.unwrap_or("无特殊限制"), false)
     }
     /// 创建协议管理主菜单embed
     pub fn create_license_manager_embed() -> CreateEmbed {
@@ -63,7 +51,7 @@ impl LicenseEmbedBuilder {
             .title(format!("📜 授权协议: {}", license.license_name))
             .description("本作品内容受以下授权协议保护：")
             .colour(Colour::BLUE);
-        
+
         Self::add_license_fields(
             embed,
             license.allow_redistribution,
@@ -93,14 +81,8 @@ impl LicenseEmbedBuilder {
             .title(format!("📜 授权协议: {name}"))
             .description("本作品内容受以下授权协议保护：")
             .colour(Colour::BLUE);
-        
-        Self::add_license_fields(
-            embed,
-            redis,
-            modify,
-            backup.unwrap_or(false),
-            rest,
-        )
+
+        Self::add_license_fields(embed, redis, modify, backup.unwrap_or(false), rest)
     }
 
     /// 创建协议发布成功embed
@@ -142,7 +124,7 @@ impl LicenseEmbedBuilder {
             .title("📜 授权协议")
             .description("本作品内容受以下授权协议保护：")
             .colour(Colour::BLUE);
-        
+
         Self::add_license_fields(
             embed,
             license.allow_redistribution,
@@ -177,14 +159,13 @@ impl LicenseEmbedBuilder {
         if let Some(footer_text) = original_footer {
             embed = embed.footer(CreateEmbedFooter::new(format!("{footer_text} | 已作废")));
         }
-        
+
         embed.timestamp(Timestamp::now())
     }
 
     /// 创建无协议embed
     pub fn create_no_license_embed() -> CreateEmbed {
-        Self::create_license_manager_embed()
-            .field("无协议", "您还没有创建任何协议。", false)
+        Self::create_license_manager_embed().field("无协议", "您还没有创建任何协议。", false)
     }
 
     /// 创建设置页面无协议embed

@@ -3,7 +3,9 @@ use poise::{CreateReply, command};
 use serenity::all::*;
 
 use super::super::Context;
-use crate::{error::BotError, types::license::DefaultLicenseIdentifier, utils::LicenseEmbedBuilder};
+use crate::{
+    error::BotError, types::license::DefaultLicenseIdentifier, utils::LicenseEmbedBuilder,
+};
 
 #[command(
     slash_command,
@@ -25,13 +27,12 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             .get_default_license(ctx.author().id)
             .await?;
         let name = match default_license {
-            Some(DefaultLicenseIdentifier::User(id)) => {
-                db.license()
-                    .get_license(id, ctx.author().id)
-                    .await?
-                    .map(|l| l.license_name)
-                    .unwrap_or_else(|| "未设置".to_string())
-            }
+            Some(DefaultLicenseIdentifier::User(id)) => db
+                .license()
+                .get_license(id, ctx.author().id)
+                .await?
+                .map(|l| l.license_name)
+                .unwrap_or_else(|| "未设置".to_string()),
             Some(DefaultLicenseIdentifier::System(name)) => {
                 // Verify the system license exists
                 let system_licenses = ctx.data().system_license_cache.get_all().await;
@@ -43,7 +44,10 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             }
             None => "未设置".to_string(),
         };
-        Ok(LicenseEmbedBuilder::create_auto_publish_settings_embed(auto_copyright, name))
+        Ok(LicenseEmbedBuilder::create_auto_publish_settings_embed(
+            auto_copyright,
+            name,
+        ))
     };
     let enable_btn = CreateButton::new("toggle_auto_publish")
         .label("切换自动发布设置")
@@ -93,30 +97,26 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 // Get both user licenses and system licenses
                 let user_licenses = db.license().get_user_licenses(ctx.author().id).await?;
                 let system_licenses = ctx.data().system_license_cache.get_all().await;
-                
+
                 // Create options for both user and system licenses
                 let mut options = Vec::new();
-                
+
                 // Add user licenses
                 for license in user_licenses {
-                    options.push(
-                        CreateSelectMenuOption::new(
-                            license.license_name.clone(), 
-                            format!("user:{}", license.id)
-                        )
-                    );
+                    options.push(CreateSelectMenuOption::new(
+                        license.license_name.clone(),
+                        format!("user:{}", license.id),
+                    ));
                 }
-                
+
                 // Add system licenses
                 for license in system_licenses {
-                    options.push(
-                        CreateSelectMenuOption::new(
-                            format!("{} (系统)", license.license_name), 
-                            format!("system:{}", license.license_name)
-                        )
-                    );
+                    options.push(CreateSelectMenuOption::new(
+                        format!("{} (系统)", license.license_name),
+                        format!("system:{}", license.license_name),
+                    ));
                 }
-                
+
                 if options.is_empty() {
                     handler
                         .edit(
@@ -156,8 +156,15 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                         let license = if selected == "none" {
                             None
                         } else if let Some(user_id) = selected.strip_prefix("user:") {
-                            user_id.parse::<i32>().ok().map(DefaultLicenseIdentifier::User)
-                        } else { selected.strip_prefix("system:").map(|system_name| DefaultLicenseIdentifier::System(system_name.to_string())) };
+                            user_id
+                                .parse::<i32>()
+                                .ok()
+                                .map(DefaultLicenseIdentifier::User)
+                        } else {
+                            selected.strip_prefix("system:").map(|system_name| {
+                                DefaultLicenseIdentifier::System(system_name.to_string())
+                            })
+                        };
 
                         db.user_settings()
                             .set_default_license(ctx.author().id, license)
