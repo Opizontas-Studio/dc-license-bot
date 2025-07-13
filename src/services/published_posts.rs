@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(post.thread_id, 123);
         assert_eq!(post.message_id, 456);
         assert_eq!(post.user_id, 789);
-        assert_eq!(post.backup_allowed, true);
+        assert!(post.backup_allowed);
     }
 
     #[tokio::test]
@@ -332,7 +332,7 @@ mod tests {
         assert!(updated.is_some());
         let updated = updated.unwrap();
         assert_eq!(updated.message_id, 999);
-        assert_eq!(updated.backup_allowed, false);
+        assert!(!updated.backup_allowed);
     }
 
     #[tokio::test]
@@ -435,7 +435,7 @@ mod tests {
 
         assert!(updated.is_some());
         let updated = updated.unwrap();
-        assert_eq!(updated.backup_allowed, false);
+        assert!(!updated.backup_allowed);
     }
 
     #[tokio::test]
@@ -497,7 +497,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(post2.message_id, 999);
-        assert_eq!(post2.backup_allowed, false);
+        assert!(!post2.backup_allowed);
 
         // Should only have one post
         assert_eq!(service.get_total_count().await.unwrap(), 1);

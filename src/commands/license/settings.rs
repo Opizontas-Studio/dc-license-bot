@@ -36,7 +36,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 // Verify the system license exists
                 let system_licenses = ctx.data().system_license_cache.get_all().await;
                 if system_licenses.iter().any(|l| l.license_name == name) {
-                    format!("{} (系统)", name)
+                    format!("{name} (系统)")
                 } else {
                     "未设置".to_string()
                 }
@@ -157,11 +157,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                             None
                         } else if let Some(user_id) = selected.strip_prefix("user:") {
                             user_id.parse::<i32>().ok().map(DefaultLicenseIdentifier::User)
-                        } else if let Some(system_name) = selected.strip_prefix("system:") {
-                            Some(DefaultLicenseIdentifier::System(system_name.to_string()))
-                        } else {
-                            None
-                        };
+                        } else { selected.strip_prefix("system:").map(|system_name| DefaultLicenseIdentifier::System(system_name.to_string())) };
 
                         db.user_settings()
                             .set_default_license(ctx.author().id, license)

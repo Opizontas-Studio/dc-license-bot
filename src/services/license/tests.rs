@@ -33,10 +33,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(license.license_name, "Test License");
-        assert_eq!(license.allow_redistribution, true);
-        assert_eq!(license.allow_modification, false);
+        assert!(license.allow_redistribution);
+        assert!(!license.allow_modification);
         assert_eq!(license.restrictions_note, Some("Test restrictions".to_string()));
-        assert_eq!(license.allow_backup, true);
+        assert!(license.allow_backup);
         assert_eq!(license.usage_count, 0);
     }
 
@@ -113,10 +113,10 @@ mod tests {
         assert!(updated.is_some());
         let updated = updated.unwrap();
         assert_eq!(updated.license_name, "Updated");
-        assert_eq!(updated.allow_redistribution, false);
-        assert_eq!(updated.allow_modification, true);
+        assert!(!updated.allow_redistribution);
+        assert!(updated.allow_modification);
         assert_eq!(updated.restrictions_note, Some("New restrictions".to_string()));
-        assert_eq!(updated.allow_backup, true);
+        assert!(updated.allow_backup);
     }
 
     #[tokio::test]

@@ -1,6 +1,6 @@
 use serenity::all::{
     ButtonStyle, ChannelId, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter, 
-    CreateMessage, GuildChannel, Timestamp, UserId, Colour, Context, CreateInteractionResponse,
+    CreateMessage, GuildChannel, Timestamp, Colour, Context, CreateInteractionResponse,
     CreateInteractionResponseMessage
 };
 use std::sync::OnceLock;
@@ -174,7 +174,7 @@ async fn create_license_preview_embed(
                "❌ 不允许", true)
         .field("限制条件", 
                license.restrictions_note.as_deref().unwrap_or("无特殊限制"), false)
-        .footer(CreateEmbedFooter::new(format!("作者: {}", display_name)))
+        .footer(CreateEmbedFooter::new(format!("作者: {display_name}")))
         .timestamp(Timestamp::now())
         .colour(Colour::GOLD))
 }

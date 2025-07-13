@@ -1,8 +1,7 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
 
 use arc_swap::ArcSwap;
@@ -12,9 +11,9 @@ use figment::{
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use serde_with::{DurationSeconds, serde_as};
+use serde_with::serde_as;
 use serenity::{
-    all::{ChannelId, Context, GuildId, RoleId, UserId},
+    all::{Context, RoleId, UserId},
     prelude::TypeMapKey,
 };
 use snafu::{OptionExt, ResultExt};

@@ -77,7 +77,7 @@ impl LicenseEmbedBuilder {
     pub fn create_license_deleted_embed(license_name: &str) -> CreateEmbed {
         CreateEmbed::new()
             .title("✅ 协议已删除")
-            .description(format!("协议 '{}' 已成功删除。", license_name))
+            .description(format!("协议 '{license_name}' 已成功删除。"))
             .colour(serenity::all::colours::branding::GREEN)
     }
 
@@ -90,7 +90,7 @@ impl LicenseEmbedBuilder {
         backup: Option<bool>,
     ) -> CreateEmbed {
         let embed = CreateEmbed::new()
-            .title(format!("📜 授权协议: {}", name))
+            .title(format!("📜 授权协议: {name}"))
             .description("本作品内容受以下授权协议保护：")
             .colour(Colour::BLUE);
         
@@ -107,7 +107,7 @@ impl LicenseEmbedBuilder {
     pub fn create_license_published_embed(license_name: &str) -> CreateEmbed {
         CreateEmbed::new()
             .title("✅ 协议已发布")
-            .description(format!("协议 '{}' 已成功发布到当前帖子。", license_name))
+            .description(format!("协议 '{license_name}' 已成功发布到当前帖子。"))
             .colour(Colour::DARK_GREEN)
     }
 
@@ -150,7 +150,7 @@ impl LicenseEmbedBuilder {
             backup_allowed,
             license.restrictions_note.as_deref(),
         )
-        .footer(CreateEmbedFooter::new(format!("作者: {}", display_name)))
+        .footer(CreateEmbedFooter::new(format!("作者: {display_name}")))
         .timestamp(Timestamp::now())
     }
 
@@ -162,10 +162,9 @@ impl LicenseEmbedBuilder {
         original_footer: Option<&str>,
     ) -> CreateEmbed {
         let mut embed = CreateEmbed::new()
-            .title(format!("⚠️ [已作废] {}", original_title))
+            .title(format!("⚠️ [已作废] {original_title}"))
             .description(format!(
-                "**此协议已被新协议替换**\n\n{}",
-                original_description
+                "**此协议已被新协议替换**\n\n{original_description}"
             ))
             .colour(Colour::from_rgb(128, 128, 128)); // 灰色表示已作废
 
@@ -176,7 +175,7 @@ impl LicenseEmbedBuilder {
 
         // 添加footer和时间戳
         if let Some(footer_text) = original_footer {
-            embed = embed.footer(CreateEmbedFooter::new(format!("{} | 已作废", footer_text)));
+            embed = embed.footer(CreateEmbedFooter::new(format!("{footer_text} | 已作废")));
         }
         
         embed.timestamp(Timestamp::now())

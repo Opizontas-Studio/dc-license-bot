@@ -219,7 +219,7 @@ mod tests {
         // Should create default settings
         let settings = service.get_or_create(user_id).await.unwrap();
         assert_eq!(settings.user_id, 123);
-        assert_eq!(settings.auto_publish_enabled, false);
+        assert!(!settings.auto_publish_enabled);
         assert_eq!(settings.default_user_license_id, None);
         assert_eq!(settings.default_system_license_name, None);
 
@@ -235,10 +235,10 @@ mod tests {
         let user_id = UserId::new(123);
 
         let settings = service.set_auto_publish(user_id, true).await.unwrap();
-        assert_eq!(settings.auto_publish_enabled, true);
+        assert!(settings.auto_publish_enabled);
 
         let settings = service.set_auto_publish(user_id, false).await.unwrap();
-        assert_eq!(settings.auto_publish_enabled, false);
+        assert!(!settings.auto_publish_enabled);
     }
 
     #[tokio::test]
@@ -271,15 +271,15 @@ mod tests {
 
         // Initially false
         let settings = service.get_or_create(user_id).await.unwrap();
-        assert_eq!(settings.auto_publish_enabled, false);
+        assert!(!settings.auto_publish_enabled);
 
         // Toggle to true
         let settings = service.toggle_auto_publish(user_id).await.unwrap();
-        assert_eq!(settings.auto_publish_enabled, true);
+        assert!(settings.auto_publish_enabled);
 
         // Toggle back to false
         let settings = service.toggle_auto_publish(user_id).await.unwrap();
-        assert_eq!(settings.auto_publish_enabled, false);
+        assert!(!settings.auto_publish_enabled);
     }
 
     #[tokio::test]
@@ -289,11 +289,11 @@ mod tests {
         let user_id = UserId::new(123);
 
         // Initially false
-        assert_eq!(service.is_auto_publish_enabled(user_id).await.unwrap(), false);
+        assert!(!service.is_auto_publish_enabled(user_id).await.unwrap());
 
         // Set to true
         service.set_auto_publish(user_id, true).await.unwrap();
-        assert_eq!(service.is_auto_publish_enabled(user_id).await.unwrap(), true);
+        assert!(service.is_auto_publish_enabled(user_id).await.unwrap());
     }
 
     #[tokio::test]

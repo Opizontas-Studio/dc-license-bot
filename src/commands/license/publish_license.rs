@@ -237,6 +237,5 @@ async fn autocomplete_license(
         .filter(|(name, _)| name.to_lowercase().contains(&partial.to_lowercase()))
         .take(25)
         .map(|(name, value)| poise::serenity_prelude::AutocompleteChoice::new(name, value))
-        .into_iter()
 }
 

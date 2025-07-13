@@ -56,7 +56,7 @@ async fn main() -> Result<(), BotError> {
     // Initialize notification service
     let notification_service = Arc::new(NotificationService::new(cfg.clone()));
 
-    let mut client = Client::builder(cfg.load().token.to_owned(), intents)
+    let mut client = Client::builder(&cfg.load().token, intents)
         .cache_settings({
             let mut s = serenity::cache::Settings::default();
             s.max_messages = 0; // Set the maximum number of messages to cache

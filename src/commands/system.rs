@@ -162,7 +162,7 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
             ctx.say("✅ 系统授权已成功从文件刷新。").await?;
         }
         Err(error) => {
-            ctx.say(format!("❌ 重载失败，请检查日志。错误信息: {}", error))
+            ctx.say(format!("❌ 重载失败，请检查日志。错误信息: {error}"))
                 .await?;
         }
     }

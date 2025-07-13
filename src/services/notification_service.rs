@@ -90,7 +90,7 @@ impl NotificationService {
             let error_text = response.text().await.unwrap_or_else(|_| "无法读取响应体".to_string());
             tracing::error!("发送备份通知失败，状态码: {}, 响应: {}", status, error_text);
             Err(BotError::GenericError {
-                message: format!("通知服务返回错误: {}", status),
+                message: format!("通知服务返回错误: {status}"),
                 source: None,
             })
         }
@@ -120,12 +120,10 @@ impl NotificationPayload {
         
         // 构造 URLs
         let discord_thread_url = format!(
-            "https://discord.com/channels/{}/{}/{}",
-            guild_id_str, channel_id_str, thread_id_str
+            "https://discord.com/channels/{guild_id_str}/{channel_id_str}/{thread_id_str}"
         );
         let direct_message_url = format!(
-            "https://discord.com/channels/{}/{}/{}",
-            guild_id_str, thread_id_str, message_id_str
+            "https://discord.com/channels/{guild_id_str}/{thread_id_str}/{message_id_str}"
         );
         
         Self {
