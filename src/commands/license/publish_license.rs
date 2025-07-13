@@ -2,7 +2,10 @@ use poise::{CreateReply, command};
 use serenity::all::*;
 use tracing::warn;
 
-use crate::{commands::Context, error::BotError, services::license::LicensePublishService, utils::LicenseEmbedBuilder};
+use crate::{
+    commands::Context, error::BotError, services::license::LicensePublishService,
+    utils::LicenseEmbedBuilder,
+};
 
 #[command(
     slash_command,
@@ -75,11 +78,7 @@ pub async fn publish_license(
                 return Ok(());
             }
         };
-        let Some(license) = db
-            .license()
-            .get_license(user_id, ctx.author().id)
-            .await?
-        else {
+        let Some(license) = db.license().get_license(user_id, ctx.author().id).await? else {
             ctx.send(
                 CreateReply::default()
                     .content("未找到该协议。")
@@ -92,7 +91,10 @@ pub async fn publish_license(
     } else if let Some(system_name) = license_id.strip_prefix("system:") {
         // 系统协议
         let system_licenses = ctx.data().system_license_cache.get_all().await;
-        let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) else {
+        let Some(system_license) = system_licenses
+            .iter()
+            .find(|l| l.license_name == system_name)
+        else {
             ctx.send(
                 CreateReply::default()
                     .content("未找到该系统协议。")
@@ -101,7 +103,7 @@ pub async fn publish_license(
             .await?;
             return Ok(());
         };
-        
+
         // 将系统协议转换为数据库模型格式
         // 使用一个虚拟的ID，因为这是系统协议
         system_license.to_user_license(ctx.author().id, -1)
@@ -119,10 +121,13 @@ pub async fn publish_license(
     let backup_allowed = backup_override.unwrap_or(license.allow_backup);
 
     // 3. 生成预览embed
-    let display_name = ctx.author_member().await
+    let display_name = ctx
+        .author_member()
+        .await
         .map(|m| m.display_name().to_string())
         .unwrap_or_else(|| ctx.author().name.clone());
-    let preview_embed = LicenseEmbedBuilder::create_license_embed(&license, backup_allowed, &display_name);
+    let preview_embed =
+        LicenseEmbedBuilder::create_license_embed(&license, backup_allowed, &display_name);
 
     // 创建按钮
     let publish_btn = CreateButton::new("publish_license")
@@ -170,14 +175,17 @@ pub async fn publish_license(
                 ctx.author().id,
                 &ctx.author().name,
                 &display_name,
-            ).await?;
+            )
+            .await?;
 
             // 更新回复
             handler
                 .edit(
                     ctx,
                     CreateReply::default()
-                        .embed(LicenseEmbedBuilder::create_license_published_embed(&license.license_name))
+                        .embed(LicenseEmbedBuilder::create_license_published_embed(
+                            &license.license_name,
+                        ))
                         .components(vec![]),
                 )
                 .await?;
@@ -210,11 +218,11 @@ async fn autocomplete_license(
     let db = ctx.data().db.clone();
 
     // 获取用户的个人协议
-    let user_licenses = match db.license().get_user_licenses(ctx.author().id).await {
-        Ok(licenses) => licenses,
-        Err(_) => vec![],
-    };
-
+    let user_licenses = db
+        .license()
+        .get_user_licenses(ctx.author().id)
+        .await
+        .unwrap_or_default();
     let system_licenses = ctx.data().system_license_cache.get_all().await;
 
     // 组合并过滤
@@ -225,17 +233,12 @@ async fn autocomplete_license(
             let value = format!("user:{}", l.id);
             (name, value)
         })
-        .chain(
-            system_licenses
-                .into_iter()
-                .map(|l| {
-                    let display_name = format!("{} (系统)", l.license_name);
-                    let value = format!("system:{}", l.license_name);
-                    (display_name, value)
-                }),
-        )
+        .chain(system_licenses.into_iter().map(|l| {
+            let display_name = format!("{} (系统)", l.license_name);
+            let value = format!("system:{}", l.license_name);
+            (display_name, value)
+        }))
         .filter(|(name, _)| name.to_lowercase().contains(&partial.to_lowercase()))
         .take(25)
         .map(|(name, value)| poise::serenity_prelude::AutocompleteChoice::new(name, value))
 }
-
