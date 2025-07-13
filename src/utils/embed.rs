@@ -24,22 +24,22 @@ impl LicenseEmbedBuilder {
     ) -> CreateEmbed {
         embed
             .field(
-                "允许社区内二次传播",
+                "社区内二次传播",
                 Self::format_permission(allow_redistribution),
                 true,
             )
             .field(
-                "允许社区内二次修改",
+                "社区内二次修改",
                 Self::format_permission(allow_modification),
                 true,
             )
             .field(
-                "允许备份",
+                "管理组备份",
                 Self::format_permission(allow_backup),
                 true,
             )
             .field(
-                "允许商业化使用",
+                "商业化使用",
                 Self::format_permission(false),
                 true,
             )

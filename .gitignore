@@ -8,3 +8,6 @@ sqlite.*
 CLAUDE.md
 data/
 docs/
+BACKUP_DEV.md
+.gitignore
+TUTORIAL.md
