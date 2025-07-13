@@ -13,10 +13,10 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serenity::{
-    all::{Context, RoleId, UserId},
+    all::{RoleId, UserId},
     prelude::TypeMapKey,
 };
-use snafu::{OptionExt, ResultExt};
+use snafu::ResultExt;
 
 use crate::error::BotError;
 
@@ -35,21 +35,6 @@ pub struct BotCfg {
 
 impl TypeMapKey for BotCfg {
     type Value = Arc<ArcSwap<BotCfg>>;
-}
-
-pub(crate) trait GetCfg {
-    async fn cfg(&self) -> Result<Arc<ArcSwap<BotCfg>>, BotError>;
-}
-
-impl GetCfg for Context {
-    async fn cfg(&self) -> Result<Arc<ArcSwap<BotCfg>>, BotError> {
-        self.data
-            .read()
-            .await
-            .get::<BotCfg>()
-            .cloned()
-            .whatever_context("Failed to get bot configuration from type map")
-    }
 }
 
 impl BotCfg {

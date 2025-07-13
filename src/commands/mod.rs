@@ -74,7 +74,7 @@ async fn register(ctx: Context<'_>) -> Result<(), BotError> {
     Ok(poise::builtins::register_application_commands_buttons(ctx).await?)
 }
 
-fn option(cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
+fn option(_cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
     poise::FrameworkOptions {
         commands: vec![
             auto_publish_settings(),

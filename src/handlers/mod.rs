@@ -9,7 +9,7 @@ use serenity::all::{Context, FullEvent, Channel, ChannelType};
 pub async fn poise_event_handler(
     ctx: &Context,
     event: &FullEvent,
-    framework: poise::FrameworkContext<'_, Data, BotError>,
+    _framework: poise::FrameworkContext<'_, Data, BotError>,
     data: &Data,
 ) -> Result<(), BotError> {
     if let FullEvent::ThreadCreate { thread } = event {

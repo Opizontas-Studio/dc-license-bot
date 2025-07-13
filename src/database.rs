@@ -1,8 +1,7 @@
 use std::path::Path;
 
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
-use serenity::{all::Context, prelude::TypeMapKey};
-use snafu::OptionExt;
+use serenity::prelude::TypeMapKey;
 
 use crate::error::BotError;
 
@@ -13,21 +12,6 @@ pub struct BotDatabase {
 
 impl TypeMapKey for BotDatabase {
     type Value = BotDatabase;
-}
-
-pub(crate) trait GetDb {
-    async fn db(&self) -> Result<BotDatabase, BotError>;
-}
-
-impl GetDb for Context {
-    async fn db(&self) -> Result<BotDatabase, BotError> {
-        self.data
-            .read()
-            .await
-            .get::<BotDatabase>()
-            .cloned()
-            .whatever_context::<&str, BotError>("Failed to get BotDatabase from context")
-    }
 }
 
 impl BotDatabase {
