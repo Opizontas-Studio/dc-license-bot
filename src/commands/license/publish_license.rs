@@ -172,9 +172,7 @@ pub async fn publish_license(
                 &thread,
                 &license,
                 backup_allowed,
-                ctx.author().id,
-                &ctx.author().name,
-                &display_name,
+                ctx.author().to_owned(),
             )
             .await?;
 
