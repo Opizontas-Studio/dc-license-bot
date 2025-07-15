@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::OnceLock, time::Instant};
 
 use serenity::all::{
-    ButtonStyle, ChannelId, Colour, Context, CreateActionRow, CreateButton, CreateEmbed,
-    CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
-    GuildChannel, Timestamp,
+    ButtonStyle, ChannelId, Context, CreateActionRow, CreateButton,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
+    GuildChannel,
 };
 use tokio::sync::RwLock;
 
 use crate::{
     commands::Data, error::BotError, services::license::LicensePublishService,
-    types::license::DefaultLicenseIdentifier,
+    types::license::DefaultLicenseIdentifier, utils::LicenseEmbedBuilder,
 };
 
 // 线程创建事件去重缓存，存储最近处理过的线程ID和处理时间
@@ -99,7 +99,7 @@ pub async fn handle_thread_create(
         .await
         .map(|m| m.display_name().to_string())?;
 
-    let embed = create_license_preview_embed(&license_model, &display_name).await?;
+    let embed = LicenseEmbedBuilder::create_auto_publish_preview_embed(&license_model, &display_name);
 
     let confirm_btn = CreateButton::new("confirm_auto_publish")
         .label("✅ 确认发布")
@@ -180,49 +180,4 @@ pub async fn handle_thread_create(
     }
 
     Ok(())
-}
-
-async fn create_license_preview_embed(
-    license: &entities::user_licenses::Model,
-    display_name: &str,
-) -> Result<CreateEmbed, BotError> {
-    Ok(CreateEmbed::new()
-        .title("📜 准备发布协议")
-        .description("检测到您启用了自动发布功能，是否要为此帖子发布以下协议？")
-        .field(
-            "允许社区内二次传播",
-            if license.allow_redistribution {
-                "✅ 允许"
-            } else {
-                "❌ 不允许"
-            },
-            true,
-        )
-        .field(
-            "允许社区内二次修改",
-            if license.allow_modification {
-                "✅ 允许"
-            } else {
-                "❌ 不允许"
-            },
-            true,
-        )
-        .field(
-            "允许备份",
-            if license.allow_backup {
-                "✅ 允许"
-            } else {
-                "❌ 不允许"
-            },
-            true,
-        )
-        .field("允许商业化使用", "❌ 不允许", true)
-        .field(
-            "限制条件",
-            license.restrictions_note.as_deref().unwrap_or("无特殊限制"),
-            false,
-        )
-        .footer(CreateEmbedFooter::new(format!("作者: {display_name}")))
-        .timestamp(Timestamp::now())
-        .colour(Colour::GOLD))
 }

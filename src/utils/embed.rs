@@ -175,4 +175,25 @@ impl LicenseEmbedBuilder {
             .description("没有可用的协议。")
             .colour(serenity::all::colours::branding::YELLOW)
     }
+
+    /// 创建自动发布预览embed
+    pub fn create_auto_publish_preview_embed(
+        license: &UserLicense,
+        display_name: &str,
+    ) -> CreateEmbed {
+        let embed = CreateEmbed::new()
+            .title("📜 准备发布协议")
+            .description("检测到您启用了自动发布功能，是否要为此帖子发布以下协议？")
+            .colour(Colour::GOLD);
+
+        Self::add_license_fields(
+            embed,
+            license.allow_redistribution,
+            license.allow_modification,
+            license.allow_backup,
+            license.restrictions_note.as_deref(),
+        )
+        .footer(CreateEmbedFooter::new(format!("作者: {display_name}")))
+        .timestamp(Timestamp::now())
+    }
 }
