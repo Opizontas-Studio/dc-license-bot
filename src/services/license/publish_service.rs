@@ -63,10 +63,17 @@ impl LicensePublishService {
         }
 
         // 2. 发布新协议
+        let display_name = thread
+            .guild_id
+            .member(http, author.id)
+            .await
+            .map(|m| m.display_name().to_string())
+            .unwrap_or_else(|_| author.display_name().to_string());
+            
         let license_embed = LicenseEmbedBuilder::create_license_embed(
             license,
             backup_allowed,
-            author.display_name(),
+            &display_name,
         );
         let new_msg = ChannelId::new(thread.id.get())
             .send_message(http, CreateMessage::new().embed(license_embed))
