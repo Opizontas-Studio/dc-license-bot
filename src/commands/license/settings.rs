@@ -4,7 +4,8 @@ use serenity::all::*;
 
 use super::super::Context;
 use crate::{
-    error::BotError, types::license::DefaultLicenseIdentifier, utils::LicenseEmbedBuilder,
+    error::BotError, types::license::DefaultLicenseIdentifier, 
+    utils::{LicenseEmbedBuilder, LicenseSelectMenuBuilder},
 };
 
 #[command(
@@ -18,10 +19,9 @@ use crate::{
 pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
     let db = ctx.data().db.clone();
     let create_embed = async || -> Result<CreateEmbed, BotError> {
-        let auto_copyright = db
-            .user_settings()
-            .is_auto_publish_enabled(ctx.author().id)
-            .await?;
+        let user_settings = db.user_settings().get_or_create(ctx.author().id).await?;
+        let auto_copyright = user_settings.auto_publish_enabled;
+        let skip_confirmation = user_settings.skip_auto_publish_confirmation;
         let default_license = db
             .user_settings()
             .get_default_license(ctx.author().id)
@@ -47,6 +47,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
         Ok(LicenseEmbedBuilder::create_auto_publish_settings_embed(
             auto_copyright,
             name,
+            skip_confirmation,
         ))
     };
     let enable_btn = CreateButton::new("toggle_auto_publish")
@@ -54,6 +55,9 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
         .style(ButtonStyle::Primary);
     let default_license_btn = CreateButton::new("set_default_license")
         .label("设置默认协议")
+        .style(ButtonStyle::Secondary);
+    let skip_confirmation_btn = CreateButton::new("toggle_skip_confirmation")
+        .label("切换跳过确认")
         .style(ButtonStyle::Secondary);
     let close_btn = CreateButton::new("close")
         .label("关闭")
@@ -64,6 +68,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             .components(vec![CreateActionRow::Buttons(vec![
                 enable_btn.clone(),
                 default_license_btn.clone(),
+                skip_confirmation_btn.clone(),
                 close_btn.clone(),
             ])])
     };
@@ -98,26 +103,8 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 let user_licenses = db.license().get_user_licenses(ctx.author().id).await?;
                 let system_licenses = ctx.data().system_license_cache.get_all().await;
 
-                // Create options for both user and system licenses
-                let mut options = Vec::new();
-
-                // Add user licenses
-                for license in user_licenses {
-                    options.push(CreateSelectMenuOption::new(
-                        license.license_name.clone(),
-                        format!("user:{}", license.id),
-                    ));
-                }
-
-                // Add system licenses
-                for license in system_licenses {
-                    options.push(CreateSelectMenuOption::new(
-                        format!("{} (系统)", license.license_name),
-                        format!("system:{}", license.license_name),
-                    ));
-                }
-
-                if options.is_empty() {
+                // 检查是否有可用的协议
+                if user_licenses.is_empty() && system_licenses.is_empty() {
                     handler
                         .edit(
                             ctx,
@@ -126,11 +113,16 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                         .await?;
                     continue;
                 }
-                let select_menu = CreateSelectMenu::new(
+                
+                // 使用辅助函数创建选择菜单
+                let select_menu = LicenseSelectMenuBuilder::create_license_select_menu(
                     "set_default_license_select",
-                    CreateSelectMenuKind::String { options },
+                    "选择默认协议",
+                    true,  // 包含用户协议
+                    true,  // 包含系统协议
+                    &user_licenses,
+                    &system_licenses,
                 )
-                .placeholder("选择默认协议")
                 .max_values(1);
 
                 let embed = create_embed().await?;
@@ -142,6 +134,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                             CreateActionRow::Buttons(vec![
                                 enable_btn.clone(),
                                 default_license_btn.clone(),
+                                skip_confirmation_btn.clone(),
                                 close_btn.clone(),
                             ]),
                         ]),
@@ -155,15 +148,14 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                     if let Some(selected) = values.first() {
                         let license = if selected == "none" {
                             None
-                        } else if let Some(user_id) = selected.strip_prefix("user:") {
-                            user_id
-                                .parse::<i32>()
-                                .ok()
-                                .map(DefaultLicenseIdentifier::User)
                         } else {
-                            selected.strip_prefix("system:").map(|system_name| {
-                                DefaultLicenseIdentifier::System(system_name.to_string())
-                            })
+                            match LicenseSelectMenuBuilder::parse_selection_value(selected)? {
+                                (true, id) => id
+                                    .parse::<i32>()
+                                    .ok()
+                                    .map(DefaultLicenseIdentifier::User),
+                                (false, name) => Some(DefaultLicenseIdentifier::System(name)),
+                            }
                         };
 
                         db.user_settings()
@@ -178,6 +170,16 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                         handler.edit(ctx, create_reply(embed)).await?;
                     }
                 }
+            }
+            "toggle_skip_confirmation" => {
+                db.user_settings()
+                    .toggle_skip_confirmation(ctx.author().id)
+                    .await?;
+                first_interaction
+                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                    .await?;
+                let embed = create_embed().await?;
+                handler.edit(ctx, create_reply(embed)).await?;
             }
             "close" => {
                 first_interaction

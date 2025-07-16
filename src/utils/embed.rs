@@ -97,6 +97,7 @@ impl LicenseEmbedBuilder {
     pub fn create_auto_publish_settings_embed(
         auto_copyright: bool,
         license_name: String,
+        skip_confirmation: bool,
     ) -> CreateEmbed {
         CreateEmbed::new()
             .title("🔧 自动发布设置")
@@ -107,6 +108,11 @@ impl LicenseEmbedBuilder {
                 true,
             )
             .field("默认协议", license_name, true)
+            .field(
+                "跳过确认",
+                if skip_confirmation { "启用" } else { "禁用" },
+                true,
+            )
             .colour(if auto_copyright {
                 serenity::all::colours::branding::GREEN
             } else {

@@ -103,6 +103,18 @@ impl UserSettingsService<'_> {
         Ok(updated)
     }
 
+    /// Toggle skip auto publish confirmation setting
+    pub async fn toggle_skip_confirmation(&self, user_id: UserId) -> Result<UserSettings, BotError> {
+        let settings = self.get_or_create(user_id).await?;
+        let new_skip = !settings.skip_auto_publish_confirmation;
+
+        let mut active_settings: ActiveModel = settings.into();
+        active_settings.skip_auto_publish_confirmation = Set(new_skip);
+
+        let updated = active_settings.update(self.0.inner()).await?;
+        Ok(updated)
+    }
+
     /// Check if auto publish is enabled for user
     pub async fn is_auto_publish_enabled(&self, user_id: UserId) -> Result<bool, BotError> {
         let settings = self.get_or_create(user_id).await?;
