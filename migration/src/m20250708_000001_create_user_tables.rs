@@ -36,6 +36,7 @@ impl MigrationTrait for Migration {
                     .col(boolean(UserSettings::SkipAutoPublishConfirmation).default(false))
                     .col(integer_null(UserSettings::DefaultUserLicenseId))
                     .col(string_null(UserSettings::DefaultSystemLicenseName))
+                    .col(boolean_null(UserSettings::DefaultSystemLicenseBackup))
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_settings_default_user_license")
@@ -100,6 +101,7 @@ enum UserSettings {
     SkipAutoPublishConfirmation,
     DefaultUserLicenseId,
     DefaultSystemLicenseName,
+    DefaultSystemLicenseBackup,
 }
 
 #[derive(DeriveIden)]

@@ -93,7 +93,12 @@ pub async fn handle_thread_create(
                     else {
                         return Ok(()); // 系统协议不存在，静默退出
                     };
-                    sys_license.to_user_license(owner_id, -1)
+                    let mut license = sys_license.to_user_license(owner_id, -1);
+                    // 如果用户设置了系统协议的备份权限覆盖，使用用户的设置
+                    if let Some(backup_override) = settings.default_system_license_backup {
+                        license.allow_backup = backup_override;
+                    }
+                    license
                 }
             };
 

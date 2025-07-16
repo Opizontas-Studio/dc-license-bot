@@ -34,6 +34,7 @@ impl UserSettingsService<'_> {
                 skip_auto_publish_confirmation: Set(false),
                 default_user_license_id: Set(None),
                 default_system_license_name: Set(None),
+                default_system_license_backup: Set(None),
             };
 
             let created = default_settings.insert(self.0.inner()).await?;
@@ -76,14 +77,17 @@ impl UserSettingsService<'_> {
             Some(DefaultLicenseIdentifier::User(id)) => {
                 active_settings.default_user_license_id = Set(Some(id));
                 active_settings.default_system_license_name = Set(None);
+                active_settings.default_system_license_backup = Set(None); // 清除系统协议备份设置
             }
             Some(DefaultLicenseIdentifier::System(name)) => {
                 active_settings.default_user_license_id = Set(None);
                 active_settings.default_system_license_name = Set(Some(name));
+                // 保持现有的备份设置，如果没有则使用系统协议的默认值
             }
             None => {
                 active_settings.default_user_license_id = Set(None);
                 active_settings.default_system_license_name = Set(None);
+                active_settings.default_system_license_backup = Set(None);
             }
         }
 
@@ -135,6 +139,21 @@ impl UserSettingsService<'_> {
         } else {
             Ok(None)
         }
+    }
+
+    /// Set system license backup override
+    pub async fn set_system_license_backup_override(
+        &self,
+        user_id: UserId,
+        allow_backup: Option<bool>,
+    ) -> Result<UserSettings, BotError> {
+        let settings = self.get_or_create(user_id).await?;
+        let mut active_settings: ActiveModel = settings.into();
+        
+        active_settings.default_system_license_backup = Set(allow_backup);
+        
+        let updated = active_settings.update(self.0.inner()).await?;
+        Ok(updated)
     }
 
     /// Clear default license (set to None)

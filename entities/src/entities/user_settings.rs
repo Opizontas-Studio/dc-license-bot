@@ -11,6 +11,7 @@ pub struct Model {
     pub skip_auto_publish_confirmation: bool,
     pub default_user_license_id: Option<i32>,
     pub default_system_license_name: Option<String>,
+    pub default_system_license_backup: Option<bool>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
