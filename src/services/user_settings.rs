@@ -69,6 +69,7 @@ impl UserSettingsService<'_> {
         &self,
         user_id: UserId,
         license: Option<DefaultLicenseIdentifier>,
+        system_backup_override: Option<bool>,
     ) -> Result<UserSettings, BotError> {
         let settings = self.get_or_create(user_id).await?;
         let mut active_settings: ActiveModel = settings.into();
@@ -77,12 +78,12 @@ impl UserSettingsService<'_> {
             Some(DefaultLicenseIdentifier::User(id)) => {
                 active_settings.default_user_license_id = Set(Some(id));
                 active_settings.default_system_license_name = Set(None);
-                active_settings.default_system_license_backup = Set(None); // 清除系统协议备份设置
+                active_settings.default_system_license_backup = Set(None);
             }
             Some(DefaultLicenseIdentifier::System(name)) => {
                 active_settings.default_user_license_id = Set(None);
                 active_settings.default_system_license_name = Set(Some(name));
-                // 保持现有的备份设置，如果没有则使用系统协议的默认值
+                active_settings.default_system_license_backup = Set(system_backup_override);
             }
             None => {
                 active_settings.default_user_license_id = Set(None);
@@ -141,24 +142,10 @@ impl UserSettingsService<'_> {
         }
     }
 
-    /// Set system license backup override
-    pub async fn set_system_license_backup_override(
-        &self,
-        user_id: UserId,
-        allow_backup: Option<bool>,
-    ) -> Result<UserSettings, BotError> {
-        let settings = self.get_or_create(user_id).await?;
-        let mut active_settings: ActiveModel = settings.into();
-        
-        active_settings.default_system_license_backup = Set(allow_backup);
-        
-        let updated = active_settings.update(self.0.inner()).await?;
-        Ok(updated)
-    }
 
     /// Clear default license (set to None)
     pub async fn clear_default_license(&self, user_id: UserId) -> Result<UserSettings, BotError> {
-        self.set_default_license(user_id, None).await
+        self.set_default_license(user_id, None, None).await
     }
 
     /// Delete user settings
@@ -297,7 +284,7 @@ mod tests {
         }
         // Test setting user license
         let settings = service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)))
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)), None)
             .await
             .unwrap();
         assert_eq!(settings.default_user_license_id, Some(42));
@@ -308,6 +295,7 @@ mod tests {
             .set_default_license(
                 user_id,
                 Some(DefaultLicenseIdentifier::System("MIT".to_string())),
+                None,
             )
             .await
             .unwrap();
@@ -318,7 +306,7 @@ mod tests {
         );
 
         // Test clearing license
-        let settings = service.set_default_license(user_id, None).await.unwrap();
+        let settings = service.set_default_license(user_id, None, None).await.unwrap();
         assert_eq!(settings.default_user_license_id, None);
         assert_eq!(settings.default_system_license_name, None);
     }
@@ -380,7 +368,7 @@ mod tests {
                 .unwrap();
         }
         service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)))
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)), None)
             .await
             .unwrap();
         assert_eq!(
@@ -393,6 +381,7 @@ mod tests {
             .set_default_license(
                 user_id,
                 Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string())),
+                None,
             )
             .await
             .unwrap();
@@ -400,6 +389,80 @@ mod tests {
             service.get_default_license(user_id).await.unwrap(),
             Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string()))
         );
+    }
+
+    #[tokio::test]
+    async fn test_system_license_backup_override() {
+        let db = setup_test_db().await;
+        let service = db.user_settings();
+        let user_id = UserId::new(123);
+
+        // Test setting system license with backup override
+        let settings = service
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::System("MIT".to_string())),
+                Some(true),
+            )
+            .await
+            .unwrap();
+        assert_eq!(settings.default_system_license_name, Some("MIT".to_string()));
+        assert_eq!(settings.default_system_license_backup, Some(true));
+
+        // Test setting system license with backup override false
+        let settings = service
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::System("Apache-2.0".to_string())),
+                Some(false),
+            )
+            .await
+            .unwrap();
+        assert_eq!(settings.default_system_license_name, Some("Apache-2.0".to_string()));
+        assert_eq!(settings.default_system_license_backup, Some(false));
+
+        // Test setting system license with no backup override
+        let settings = service
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::System("GPL-3.0".to_string())),
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(settings.default_system_license_name, Some("GPL-3.0".to_string()));
+        assert_eq!(settings.default_system_license_backup, None);
+
+        // Test setting user license clears system backup override
+        for _ in 0..5 {
+            db.license()
+                .create(
+                    user_id,
+                    "Test License".to_string(),
+                    true,
+                    false,
+                    None,
+                    false,
+                )
+                .await
+                .unwrap();
+        }
+        let settings = service
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(1)), None)
+            .await
+            .unwrap();
+        assert_eq!(settings.default_user_license_id, Some(1));
+        assert_eq!(settings.default_system_license_name, None);
+        assert_eq!(settings.default_system_license_backup, None);
+
+        // Test clearing license clears all settings
+        let settings = service
+            .set_default_license(user_id, None, None)
+            .await
+            .unwrap();
+        assert_eq!(settings.default_user_license_id, None);
+        assert_eq!(settings.default_system_license_name, None);
+        assert_eq!(settings.default_system_license_backup, None);
     }
 
     #[tokio::test]

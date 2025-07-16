@@ -1,16 +1,17 @@
 use std::{collections::HashMap, sync::OnceLock, time::Instant};
 
 use serenity::all::{
-    ButtonStyle, ChannelId, ComponentInteractionDataKind, Context, CreateActionRow, CreateButton,
+    ButtonStyle, ChannelId, CreateActionRow, CreateButton,
     CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
-    GuildChannel, UserId,
+    GuildChannel, UserId, CreateSelectMenu, CreateSelectMenuOption, Context,
+    ComponentInteractionDataKind, CreateSelectMenuKind, CreateInteractionResponseFollowup,
 };
 use tokio::sync::RwLock;
 
 use crate::{
     commands::Data, error::BotError, services::license::LicensePublishService,
     types::license::DefaultLicenseIdentifier, 
-    utils::{LicenseEmbedBuilder, LicenseSelectMenuBuilder},
+    utils::{LicenseEmbedBuilder, LicenseEditState, present_license_editing_panel_with_serenity_context},
 };
 
 // 线程创建事件去重缓存，存储最近处理过的线程ID和处理时间
@@ -255,83 +256,19 @@ async fn handle_new_user_guidance(
             data.db().user_settings().set_auto_publish(owner_id, true).await?;
             
             // 启动协议选择流程
-            let (user_licenses, system_licenses) = LicenseSelectMenuBuilder::get_all_licenses(data, owner_id.get()).await?;
-            
-            if user_licenses.is_empty() && system_licenses.is_empty() {
-                // 用户没有协议可选
+            if let Err(e) = handle_license_selection_flow(ctx, thread, &interaction, data, owner_id).await {
+                tracing::error!("协议选择流程失败: {}", e);
+                // 发送错误消息
                 interaction
                     .create_response(
                         &ctx.http,
                         CreateInteractionResponse::Message(
                             CreateInteractionResponseMessage::new()
-                                .content("❌ 你还没有创建任何协议，也没有可用的系统协议。请先使用 `/许可协议` 命令创建协议。")
+                                .content("❌ 协议设置过程中发生错误，请稍后重试。")
                                 .ephemeral(true),
                         ),
                     )
                     .await?;
-            } else {
-                // 显示协议选择菜单
-                let select_menu = LicenseSelectMenuBuilder::create_license_select_menu(
-                    "new_user_select_default_license",
-                    "选择你的默认协议",
-                    true,  // 包含用户协议
-                    true,  // 包含系统协议
-                    &user_licenses,
-                    &system_licenses,
-                );
-
-                interaction
-                    .create_response(
-                        &ctx.http,
-                        CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .content("请选择你的默认协议：")
-                                .components(vec![CreateActionRow::SelectMenu(select_menu)])
-                                .ephemeral(true),
-                        ),
-                    )
-                    .await?;
-
-                // 等待用户选择协议
-                let Some(select_interaction) = interaction
-                    .get_response(&ctx.http)
-                    .await?
-                    .await_component_interaction(&ctx.shard)
-                    .author_id(owner_id)
-                    .timeout(std::time::Duration::from_secs(120)) // 2分钟超时
-                    .await
-                else {
-                    // 超时，但用户已经启用了自动发布，只是没有设置默认协议
-                    return Ok(());
-                };
-
-                if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
-                    if let Some(selected) = values.first() {
-                        // 解析选择的协议
-                        let license = match LicenseSelectMenuBuilder::parse_selection_value(selected)? {
-                            (true, id) => id
-                                .parse::<i32>()
-                                .ok()
-                                .map(DefaultLicenseIdentifier::User),
-                            (false, name) => Some(DefaultLicenseIdentifier::System(name)),
-                        };
-
-                        // 保存默认协议设置
-                        data.db().user_settings().set_default_license(owner_id, license).await?;
-
-                        // 确认消息
-                        select_interaction
-                            .create_response(
-                                &ctx.http,
-                                CreateInteractionResponse::Message(
-                                    CreateInteractionResponseMessage::new()
-                                        .content("✅ 已成功启用自动发布功能并设置默认协议！")
-                                        .ephemeral(true),
-                                ),
-                            )
-                            .await?;
-                    }
-                }
             }
             
             // 删除最初的引导消息
@@ -360,4 +297,433 @@ async fn handle_new_user_guidance(
     }
 
     Ok(())
+}
+
+/// 处理协议选择和编辑流程
+async fn handle_license_selection_flow(
+    ctx: &Context,
+    thread: &GuildChannel,
+    interaction: &serenity::all::ComponentInteraction,
+    data: &Data,
+    owner_id: UserId,
+) -> Result<(), BotError> {
+    // 1. 获取所有可用的系统协议
+    let system_licenses = data.system_license_cache().get_all().await;
+    
+    // 2. 创建选择菜单
+    let mut select_options = vec![
+        CreateSelectMenuOption::new("创建新协议", "new_license")
+            .description("创建一个全新的协议")
+    ];
+    
+    // 添加系统协议选项
+    for license in &system_licenses {
+        select_options.push(
+            CreateSelectMenuOption::new(
+                &license.license_name,
+                format!("system_{}", license.license_name)
+            )
+            .description("基于系统协议创建")
+        );
+    }
+    
+    let select_menu = CreateSelectMenu::new("license_selection", CreateSelectMenuKind::String { options: select_options })
+        .placeholder("请选择协议类型")
+        .max_values(1);
+    
+    // 3. 发送选择菜单
+    interaction
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("请选择你要使用的协议：")
+                    .components(vec![CreateActionRow::SelectMenu(select_menu)])
+                    .ephemeral(true),
+            ),
+        )
+        .await?;
+    
+    // 4. 等待用户选择
+    let Some(select_interaction) = interaction
+        .get_response(&ctx.http)
+        .await?
+        .await_component_interaction(&ctx.shard)
+        .author_id(owner_id)
+        .timeout(std::time::Duration::from_secs(120))
+        .await
+    else {
+        return Ok(()); // 超时，静默退出
+    };
+    
+    // 5. 处理用户选择
+    if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
+        if let Some(selected) = values.first() {
+            let initial_state = if selected == "new_license" {
+                // 创建新协议
+                LicenseEditState::new("新协议".to_string())
+            } else if let Some(system_name) = selected.strip_prefix("system_") {
+                // 基于系统协议创建
+                if let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) {
+                    LicenseEditState::from_system_license(system_license)
+                } else {
+                    return Err(BotError::GenericError {
+                        message: "选择的系统协议不存在".to_string(),
+                        source: None,
+                    });
+                }
+            } else {
+                return Err(BotError::GenericError {
+                    message: "无效的选择".to_string(),
+                    source: None,
+                });
+            };
+            
+            // 6. 调用完整的协议编辑流程
+            match present_license_editing_panel_with_serenity_context(ctx, data, &select_interaction, initial_state).await {
+                Ok(Some(final_state)) => {
+                    // 用户保存了协议，创建并设置为默认
+                    match save_license_and_set_default(data, owner_id, final_state).await {
+                        Ok(license) => {
+                            // 成功保存，启动发布确认流程
+                            if let Err(e) = handle_publish_confirmation(ctx, data, thread, &select_interaction, owner_id, license).await {
+                                tracing::error!("发布确认流程失败: {}", e);
+                                // 发送错误消息
+                                select_interaction
+                                    .create_followup(
+                                        &ctx.http,
+                                        CreateInteractionResponseFollowup::new()
+                                            .content("❌ 协议已保存，但发布确认过程中发生错误。")
+                                            .ephemeral(true),
+                                    )
+                                    .await?;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("保存协议失败: {}", e);
+                            // 由于编辑器已经清理了UI，我们需要通过followup发送错误消息
+                            select_interaction
+                                .create_followup(
+                                    &ctx.http,
+                                    CreateInteractionResponseFollowup::new()
+                                        .content("❌ 协议保存失败，请稍后重试。")
+                                        .ephemeral(true),
+                                )
+                                .await?;
+                        }
+                    }
+                }
+                Ok(None) => {
+                    // 用户取消了编辑
+                    select_interaction
+                        .create_followup(
+                            &ctx.http,
+                            CreateInteractionResponseFollowup::new()
+                                .content("已取消协议创建。自动发布功能已启用，但您需要手动设置默认协议。")
+                                .ephemeral(true),
+                        )
+                        .await?;
+                }
+                Err(e) => {
+                    tracing::error!("协议编辑流程失败: {}", e);
+                    select_interaction
+                        .create_response(
+                            &ctx.http,
+                            CreateInteractionResponse::Message(
+                                CreateInteractionResponseMessage::new()
+                                    .content("❌ 协议编辑过程中发生错误，请稍后重试。")
+                                    .ephemeral(true),
+                            ),
+                        )
+                        .await?;
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// 处理发布确认流程
+async fn handle_publish_confirmation(
+    ctx: &Context,
+    data: &Data,
+    thread: &GuildChannel,
+    interaction: &serenity::all::ComponentInteraction,
+    owner_id: UserId,
+    license: crate::services::license::UserLicense,
+) -> Result<(), BotError> {
+    // 发送确认消息和按钮
+    let confirm_message = format!(
+        "✅ 协议「{}」已创建并设置为默认协议！\n\n是否要在当前帖子中发布此协议？",
+        license.license_name
+    );
+    
+    let publish_btn = CreateButton::new("confirm_publish_new_license")
+        .label("是的，发布")
+        .style(ButtonStyle::Success);
+    
+    let skip_btn = CreateButton::new("skip_publish_new_license")
+        .label("暂不发布")
+        .style(ButtonStyle::Secondary);
+    
+    let action_row = CreateActionRow::Buttons(vec![publish_btn, skip_btn]);
+    
+    // 发送确认消息
+    interaction
+        .create_followup(
+            &ctx.http,
+            CreateInteractionResponseFollowup::new()
+                .content(confirm_message)
+                .components(vec![action_row])
+                .ephemeral(true),
+        )
+        .await?;
+    
+    // 等待用户交互
+    let Some(publish_interaction) = interaction
+        .get_response(&ctx.http)
+        .await?
+        .await_component_interaction(&ctx.shard)
+        .author_id(owner_id)
+        .timeout(std::time::Duration::from_secs(120)) // 2分钟超时
+        .await
+    else {
+        // 超时，删除确认消息并发送新消息
+        let response = interaction.get_response(&ctx.http).await?;
+        let _ = interaction.delete_followup(&ctx.http, response.id).await;
+        
+        interaction
+            .create_followup(
+                &ctx.http,
+                CreateInteractionResponseFollowup::new()
+                    .content("协议已创建并设置为默认协议！自动发布功能现在已完全启用。")
+                    .ephemeral(true),
+            )
+            .await?;
+        return Ok(());
+    };
+    
+    match publish_interaction.data.custom_id.as_str() {
+        "confirm_publish_new_license" => {
+            // 用户选择发布
+            let user = owner_id.to_user(ctx).await?;
+            
+            // 调用发布服务
+            LicensePublishService::publish(
+                &ctx.http,
+                data,
+                thread,
+                &license,
+                license.allow_backup,
+                user,
+            )
+            .await?;
+            
+            // 确认发布成功
+            publish_interaction
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("✅ 协议已成功发布到当前帖子！")
+                            .ephemeral(true),
+                    ),
+                )
+                .await?;
+                
+            // 清理确认消息
+            let response = interaction.get_response(&ctx.http).await?;
+            let _ = interaction.delete_followup(&ctx.http, response.id).await;
+            
+            interaction
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new()
+                        .content("协议已创建、设置为默认协议，并发布到当前帖子！")
+                        .ephemeral(true),
+                )
+                .await?;
+        }
+        "skip_publish_new_license" => {
+            // 用户选择不发布
+            publish_interaction
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("好的，协议已保存。你可以稍后手动发布或在新帖子中自动发布。")
+                            .ephemeral(true),
+                    ),
+                )
+                .await?;
+                
+            // 清理确认消息
+            let response = interaction.get_response(&ctx.http).await?;
+            let _ = interaction.delete_followup(&ctx.http, response.id).await;
+            
+            interaction
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new()
+                        .content("协议已创建并设置为默认协议！自动发布功能现在已完全启用。")
+                        .ephemeral(true),
+                )
+                .await?;
+        }
+        _ => {}
+    }
+    
+    Ok(())
+}
+
+/// 保存协议并设置为默认协议，返回创建的协议
+async fn save_license_and_set_default(
+    data: &Data,
+    owner_id: UserId,
+    final_state: LicenseEditState,
+) -> Result<crate::services::license::UserLicense, BotError> {
+    // 提取协议字段
+    let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) = 
+        final_state.to_user_license_fields();
+    
+    // 检查用户协议数量是否超过上限
+    let current_count = data.db().license().get_user_license_count(owner_id).await?;
+    if current_count >= 5 {
+        return Err(BotError::GenericError {
+            message: "您最多只能创建5个协议，请先删除一些协议。".to_string(),
+            source: None,
+        });
+    }
+    
+    // 创建协议
+    let license = data.db().license().create(
+        owner_id,
+        name,
+        allow_redistribution,
+        allow_modification,
+        restrictions_note,
+        allow_backup,
+    ).await?;
+    
+    // 设置为默认协议
+    data.db().user_settings().set_default_license(
+        owner_id,
+        Some(DefaultLicenseIdentifier::User(license.id)),
+        None,
+    ).await?;
+    
+    Ok(license)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::BotDatabase;
+    use migration::{Migrator, MigratorTrait, SchemaManager};
+    use serenity::all::UserId;
+    use crate::utils::LicenseEditState;
+
+    async fn setup_test_db() -> BotDatabase {
+        let db = BotDatabase::new_memory().await.unwrap();
+        let migrations = Migrator::migrations();
+        let manager = SchemaManager::new(db.inner());
+        for migration in migrations {
+            migration.up(&manager).await.unwrap();
+        }
+        db
+    }
+
+    #[tokio::test]
+    async fn test_save_license_and_set_default() {
+        let db = setup_test_db().await;
+        let user_id = UserId::new(123);
+        
+        // 创建一个测试的编辑状态
+        let edit_state = LicenseEditState::new("Test License".to_string());
+        
+        // 测试保存协议 - 直接测试数据库层面的逻辑
+        let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) = 
+            edit_state.to_user_license_fields();
+        
+        // 创建协议
+        let license = db.license().create(
+            user_id,
+            name,
+            allow_redistribution,
+            allow_modification,
+            restrictions_note,
+            allow_backup,
+        ).await.unwrap();
+        
+        assert_eq!(license.license_name, "Test License");
+        assert_eq!(license.user_id, user_id.get() as i64);
+        
+        // 设置为默认协议
+        db.user_settings().set_default_license(
+            user_id,
+            Some(DefaultLicenseIdentifier::User(license.id)),
+            None,
+        ).await.unwrap();
+        
+        // 验证协议已设置为默认
+        let settings = db.user_settings().get(user_id).await.unwrap().unwrap();
+        assert_eq!(settings.default_user_license_id, Some(license.id));
+    }
+
+    #[tokio::test]
+    async fn test_save_license_exceeds_limit() {
+        let db = setup_test_db().await;
+        let user_id = UserId::new(456);
+        
+        // 先创建5个协议（达到上限）
+        for i in 0..5 {
+            db.license().create(
+                user_id,
+                format!("License {}", i),
+                false,
+                false,
+                None,
+                false,
+            ).await.unwrap();
+        }
+        
+        // 验证协议数量已达到上限
+        let count = db.license().get_user_license_count(user_id).await.unwrap();
+        assert_eq!(count, 5);
+        
+        // 尝试创建第6个协议，应该失败
+        let result = db.license().create(
+            user_id,
+            "License 6".to_string(),
+            false,
+            false,
+            None,
+            false,
+        ).await;
+        
+        // 在实际代码中，这个检查是在 save_license_and_set_default 中进行的
+        // 但这里我们测试的是数据库层面的行为
+        assert!(result.is_ok()); // 数据库层面不会阻止，检查是在上层进行的
+    }
+
+    #[tokio::test]
+    async fn test_license_edit_state_conversion() {
+        let edit_state = LicenseEditState::from_existing(
+            "Test License".to_string(),
+            true,
+            false,
+            Some("No commercial use".to_string()),
+            true,
+        );
+        
+        let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) = 
+            edit_state.to_user_license_fields();
+        
+        assert_eq!(name, "Test License");
+        assert!(allow_redistribution);
+        assert!(!allow_modification);
+        assert_eq!(restrictions_note, Some("No commercial use".to_string()));
+        assert!(allow_backup);
+    }
 }

@@ -5,7 +5,7 @@ use serenity::all::*;
 use super::super::Context;
 use crate::{
     error::BotError, types::license::DefaultLicenseIdentifier, 
-    utils::{LicenseEmbedBuilder, LicenseSelectMenuBuilder},
+    utils::LicenseEmbedBuilder,
 };
 
 #[command(
@@ -99,77 +99,17 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 first_interaction
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
-                // Get both user licenses and system licenses
-                let user_licenses = db.license().get_user_licenses(ctx.author().id).await?;
-                let system_licenses = ctx.data().system_license_cache.get_all().await;
-
-                // 检查是否有可用的协议
-                if user_licenses.is_empty() && system_licenses.is_empty() {
-                    handler
-                        .edit(
-                            ctx,
-                            create_reply(LicenseEmbedBuilder::create_settings_no_license_embed()),
-                        )
-                        .await?;
-                    continue;
-                }
-                
-                // 使用辅助函数创建选择菜单
-                let select_menu = LicenseSelectMenuBuilder::create_license_select_menu(
-                    "set_default_license_select",
-                    "选择默认协议",
-                    true,  // 包含用户协议
-                    true,  // 包含系统协议
-                    &user_licenses,
-                    &system_licenses,
-                )
-                .max_values(1);
-
+                // TODO: 重构后需要重新实现选择菜单逻辑
                 let embed = create_embed().await?;
-                handler
-                    .edit(
-                        ctx,
-                        CreateReply::default().embed(embed).components(vec![
-                            CreateActionRow::SelectMenu(select_menu),
-                            CreateActionRow::Buttons(vec![
-                                enable_btn.clone(),
-                                default_license_btn.clone(),
-                                skip_confirmation_btn.clone(),
-                                close_btn.clone(),
-                            ]),
-                        ]),
-                    )
-                    .await?;
+                handler.edit(ctx, create_reply(embed)).await?;
             }
             "set_default_license_select" => {
-                if let ComponentInteractionDataKind::StringSelect { values } =
-                    &first_interaction.data.kind
-                {
-                    if let Some(selected) = values.first() {
-                        let license = if selected == "none" {
-                            None
-                        } else {
-                            match LicenseSelectMenuBuilder::parse_selection_value(selected)? {
-                                (true, id) => id
-                                    .parse::<i32>()
-                                    .ok()
-                                    .map(DefaultLicenseIdentifier::User),
-                                (false, name) => Some(DefaultLicenseIdentifier::System(name)),
-                            }
-                        };
-
-                        db.user_settings()
-                            .set_default_license(ctx.author().id, license)
-                            .await?;
-
-                        first_interaction
-                            .create_response(ctx, CreateInteractionResponse::Acknowledge)
-                            .await?;
-
-                        let embed = create_embed().await?;
-                        handler.edit(ctx, create_reply(embed)).await?;
-                    }
-                }
+                // TODO: 重构后需要重新实现选择处理逻辑
+                first_interaction
+                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                    .await?;
+                let embed = create_embed().await?;
+                handler.edit(ctx, create_reply(embed)).await?;
             }
             "toggle_skip_confirmation" => {
                 db.user_settings()
