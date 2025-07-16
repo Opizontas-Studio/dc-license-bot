@@ -33,6 +33,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(big_unsigned_uniq(UserSettings::UserId).primary_key())
                     .col(boolean(UserSettings::AutoPublishEnabled).default(false))
+                    .col(boolean(UserSettings::SkipAutoPublishConfirmation).default(false))
                     .col(integer_null(UserSettings::DefaultUserLicenseId))
                     .col(string_null(UserSettings::DefaultSystemLicenseName))
                     .foreign_key(
@@ -96,6 +97,7 @@ enum UserSettings {
     Table,
     UserId,
     AutoPublishEnabled,
+    SkipAutoPublishConfirmation,
     DefaultUserLicenseId,
     DefaultSystemLicenseName,
 }

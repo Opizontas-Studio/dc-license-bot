@@ -8,6 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub user_id: i64,
     pub auto_publish_enabled: bool,
+    pub skip_auto_publish_confirmation: bool,
     pub default_user_license_id: Option<i32>,
     pub default_system_license_name: Option<String>,
 }

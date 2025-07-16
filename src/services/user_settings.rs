@@ -31,6 +31,7 @@ impl UserSettingsService<'_> {
             let default_settings = ActiveModel {
                 user_id: Set(user_id_i64),
                 auto_publish_enabled: Set(false),
+                skip_auto_publish_confirmation: Set(false),
                 default_user_license_id: Set(None),
                 default_system_license_name: Set(None),
             };
