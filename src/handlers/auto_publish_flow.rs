@@ -382,6 +382,25 @@ impl<'a> AutoPublishFlow<'a> {
                     .user_settings()
                     .set_auto_publish(self.owner_id, true)
                     .await?;
+
+                // 立即确认交互并删除引导消息
+                interaction
+                    .create_response(
+                        &self.ctx.http,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .content("✅ 自动发布功能已启用！")
+                                .ephemeral(true),
+                        ),
+                    )
+                    .await?;
+
+                // 删除旧的引导消息
+                if let Some(message) = &self.current_message {
+                    let _ = message.delete(&self.ctx.http).await;
+                    self.current_message = None;
+                }
+
                 self.transition_to(FlowState::SelectingLicense);
             }
             "disable_auto_publish_setup" => {
