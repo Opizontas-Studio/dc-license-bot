@@ -1,8 +1,10 @@
+mod auto_publish_ui;
 mod children;
 mod editor_core;
 mod embed;
 mod license_editor;
 
+pub use auto_publish_ui::AutoPublishUI;
 pub use children::get_all_children_channels;
 pub use editor_core::{EditorCore, LicenseEditState, UIProvider};
 pub use embed::LicenseEmbedBuilder;

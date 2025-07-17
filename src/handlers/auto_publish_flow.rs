@@ -1,7 +1,6 @@
 use serenity::all::{
-    ButtonStyle, ChannelId, ComponentInteractionDataKind, Context, CreateActionRow, CreateButton,
-    CreateInteractionResponse, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
-    CreateMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, GuildChannel,
+    ChannelId, ComponentInteractionDataKind, Context, CreateInteractionResponse, 
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GuildChannel,
     Message, UserId,
 };
 
@@ -10,7 +9,7 @@ use crate::{
     error::BotError,
     services::license::LicensePublishService,
     types::license::DefaultLicenseIdentifier,
-    utils::{LicenseEditState, LicenseEmbedBuilder, present_license_editing_panel},
+    utils::{AutoPublishUI, LicenseEditState, present_license_editing_panel},
 };
 
 /// 自动发布流程的状态定义
@@ -48,6 +47,8 @@ pub struct AutoPublishFlow<'a> {
     system_licenses: Option<Vec<crate::types::license::SystemLicense>>,
     /// 当前等待的交互
     pending_interaction: Option<serenity::all::ComponentInteraction>,
+    /// 编辑器交互（用于新用户流程的followup）
+    editor_interaction: Option<serenity::all::ComponentInteraction>,
 }
 
 impl<'a> AutoPublishFlow<'a> {
@@ -67,6 +68,7 @@ impl<'a> AutoPublishFlow<'a> {
             current_message: None,
             system_licenses: None,
             pending_interaction: None,
+            editor_interaction: None,
         }
     }
 
@@ -180,7 +182,10 @@ impl<'a> AutoPublishFlow<'a> {
 
     /// 清理资源
     async fn cleanup(&mut self) {
+        // 只清理需要删除的消息（通常是错误状态时的消息）
+        // followup消息和已完成的消息不需要删除
         if let Some(message) = &self.current_message {
+            // 只删除确认类型的消息，其他消息保留作为状态记录
             let _ = message.delete(&self.ctx.http).await;
         }
     }
@@ -305,21 +310,8 @@ impl<'a> AutoPublishFlow<'a> {
             .await
             .map(|m| m.display_name().to_string())?;
 
-        let embed = LicenseEmbedBuilder::create_auto_publish_preview_embed(license, &display_name);
-
-        let confirm_btn = CreateButton::new("confirm_auto_publish")
-            .label("✅ 确认发布")
-            .style(ButtonStyle::Success);
-
-        let cancel_btn = CreateButton::new("cancel_auto_publish")
-            .label("❌ 取消")
-            .style(ButtonStyle::Danger);
-
-        let action_row = CreateActionRow::Buttons(vec![confirm_btn, cancel_btn]);
-
-        let message = CreateMessage::new()
-            .embed(embed)
-            .components(vec![action_row]);
+        // 使用UI构建器创建确认面板
+        let message = AutoPublishUI::build_auto_publish_confirmation(license, &display_name);
 
         let sent_message = ChannelId::new(self.thread.id.get())
             .send_message(&self.ctx.http, message)
@@ -331,23 +323,8 @@ impl<'a> AutoPublishFlow<'a> {
 
     /// 处理等待新用户选择状态
     async fn handle_awaiting_guidance(&mut self) -> Result<(), BotError> {
-        // 构建引导消息和按钮
-        let welcome_message =
-            "你好！我们发现你发了一个新帖子。你是否想开启'自动添加许可协议'的功能呢？";
-
-        let enable_btn = CreateButton::new("enable_auto_publish_setup")
-            .label("启用")
-            .style(ButtonStyle::Success);
-
-        let disable_btn = CreateButton::new("disable_auto_publish_setup")
-            .label("关闭")
-            .style(ButtonStyle::Danger);
-
-        let action_row = CreateActionRow::Buttons(vec![enable_btn, disable_btn]);
-
-        let message = CreateMessage::new()
-            .content(welcome_message)
-            .components(vec![action_row]);
+        // 使用UI构建器创建引导消息
+        let message = AutoPublishUI::build_guidance_message();
 
         let sent_message = ChannelId::new(self.thread.id.get())
             .send_message(&self.ctx.http, message)
@@ -374,40 +351,15 @@ impl<'a> AutoPublishFlow<'a> {
                 let system_licenses = self.data.system_license_cache().get_all().await;
                 self.system_licenses = Some(system_licenses.clone());
 
-                // 创建选择菜单
-                let mut select_options = vec![
-                    CreateSelectMenuOption::new("创建新协议", "new_license")
-                        .description("创建一个全新的协议"),
-                ];
-
-                for license in &system_licenses {
-                    select_options.push(
-                        CreateSelectMenuOption::new(
-                            &license.license_name,
-                            format!("system_{}", license.license_name),
-                        )
-                        .description("基于系统协议创建"),
-                    );
-                }
-
-                let select_menu = CreateSelectMenu::new(
-                    "license_selection",
-                    CreateSelectMenuKind::String {
-                        options: select_options,
-                    },
-                )
-                .placeholder("请选择协议类型")
-                .max_values(1);
+                // 使用UI构建器创建选择菜单
+                let select_menu = AutoPublishUI::build_license_selection_menu(&system_licenses);
 
                 // 立即确认交互并附加选择菜单 - 全部 ephemeral
                 interaction
                     .create_response(
                         &self.ctx.http,
                         CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .content("✅ 自动发布功能已启用！\n\n请选择你要使用的协议：")
-                                .components(vec![CreateActionRow::SelectMenu(select_menu)])
-                                .ephemeral(true),
+                            AutoPublishUI::create_enable_response(select_menu)
                         ),
                     )
                     .await?;
@@ -476,11 +428,7 @@ impl<'a> AutoPublishFlow<'a> {
                     .create_response(
                         &self.ctx.http,
                         CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .content(
-                                    "好的，如果你改变主意，可以随时使用 `/自动发布设置` 手动开启。",
-                                )
-                                .ephemeral(true),
+                            AutoPublishUI::create_disable_response()
                         ),
                     )
                     .await?;
@@ -513,7 +461,8 @@ impl<'a> AutoPublishFlow<'a> {
         // 调用协议编辑面板
         match present_license_editing_panel(self.ctx, self.data, &interaction, edit_state).await {
             Ok(Some(final_state)) => {
-                // 用户保存了协议
+                // 用户保存了协议，保存编辑器交互用于后续followup
+                self.editor_interaction = Some(interaction.clone());
                 match self.save_license_and_set_default(final_state).await {
                     Ok(license) => {
                         self.transition_to(FlowState::ConfirmingSave(license));
@@ -538,11 +487,7 @@ impl<'a> AutoPublishFlow<'a> {
                 interaction
                     .create_followup(
                         &self.ctx.http,
-                        CreateInteractionResponseFollowup::new()
-                            .content(
-                                "已取消协议创建。自动发布功能已启用，但您需要手动设置默认协议。",
-                            )
-                            .ephemeral(true),
+                        AutoPublishUI::create_cancel_edit_response(),
                     )
                     .await?;
                 self.transition_to(FlowState::Done);
@@ -614,9 +559,7 @@ impl<'a> AutoPublishFlow<'a> {
                         .create_response(
                             &self.ctx.http,
                             CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("❌ 已取消发布")
-                                    .ephemeral(true),
+                                AutoPublishUI::create_publish_cancel_response()
                             ),
                         )
                         .await?;
@@ -625,11 +568,22 @@ impl<'a> AutoPublishFlow<'a> {
             }
         } else {
             // 来自新用户流程的发布确认
-            self.show_new_user_publish_confirmation(&license).await?;
+            let editor_interaction = self.editor_interaction.take().ok_or_else(|| BotError::GenericError {
+                message: "没有可用的编辑器交互来显示确认".to_string(),
+                source: None,
+            })?;
+            
+            let mut followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
 
-            // 等待用户交互
-            let Some(interaction) = self.wait_for_interaction(120).await? else {
-                // 超时已在wait_for_interaction中处理
+            // 等待用户交互 - 从followup消息等待
+            let Some(interaction) = followup_message
+                .await_component_interaction(&self.ctx.shard)
+                .author_id(self.owner_id)
+                .timeout(std::time::Duration::from_secs(120))
+                .await
+            else {
+                // 超时，转到完成状态
+                self.transition_to(FlowState::Done);
                 return Ok(());
             };
 
@@ -650,19 +604,15 @@ impl<'a> AutoPublishFlow<'a> {
                         )
                         .await?;
 
-                    // 编辑为最终状态
-                    if let Some(message) = &self.current_message {
-                        let message_id = message.id;
-                        ChannelId::new(self.thread.id.get())
-                            .edit_message(
-                                &self.ctx.http,
-                                message_id,
-                                serenity::all::EditMessage::new()
-                                    .content("协议已创建、设置为默认协议，并发布到当前帖子！")
-                                    .components(Vec::new()),
-                            )
-                            .await?;
-                    }
+                    // 编辑followup消息为最终状态
+                    followup_message
+                        .edit(
+                            &self.ctx.http,
+                            serenity::all::EditMessage::new()
+                                .content("协议已创建、设置为默认协议，并发布到当前帖子！")
+                                .components(Vec::new()),
+                        )
+                        .await?;
                 }
                 "skip_publish_new_license" => {
                     // 不发布
@@ -677,21 +627,13 @@ impl<'a> AutoPublishFlow<'a> {
                         )
                         .await?;
 
-                    // 编辑为最终状态
-                    if let Some(message) = &self.current_message {
-                        let message_id = message.id;
-                        ChannelId::new(self.thread.id.get())
-                            .edit_message(
-                                &self.ctx.http,
-                                message_id,
-                                serenity::all::EditMessage::new()
-                                    .content(
-                                        "协议已创建并设置为默认协议！自动发布功能现在已完全启用。",
-                                    )
-                                    .components(Vec::new()),
-                            )
-                            .await?;
-                    }
+                    // 编辑followup消息为最终状态
+                    followup_message
+                        .edit(
+                            &self.ctx.http,
+                            AutoPublishUI::create_publish_success_edit(),
+                        )
+                        .await?;
                 }
                 _ => {}
             }
@@ -701,36 +643,20 @@ impl<'a> AutoPublishFlow<'a> {
         Ok(())
     }
 
-    /// 显示新用户发布确认
+    /// 显示新用户发布确认（使用followup消息）
     async fn show_new_user_publish_confirmation(
         &mut self,
         license: &crate::services::license::UserLicense,
-    ) -> Result<(), BotError> {
-        let confirm_message = format!(
-            "✅ 协议「{}」已创建并设置为默认协议！\n\n是否要在当前帖子中发布此协议？",
-            license.license_name
-        );
-
-        let publish_btn = CreateButton::new("confirm_publish_new_license")
-            .label("是的，发布")
-            .style(ButtonStyle::Success);
-
-        let skip_btn = CreateButton::new("skip_publish_new_license")
-            .label("暂不发布")
-            .style(ButtonStyle::Secondary);
-
-        let action_row = CreateActionRow::Buttons(vec![publish_btn, skip_btn]);
-
-        let message = CreateMessage::new()
-            .content(confirm_message)
-            .components(vec![action_row]);
-
-        let sent_message = ChannelId::new(self.thread.id.get())
-            .send_message(&self.ctx.http, message)
+        interaction: &serenity::all::ComponentInteraction,
+    ) -> Result<serenity::all::Message, BotError> {
+        let followup_message = interaction
+            .create_followup(
+                &self.ctx.http,
+                AutoPublishUI::create_new_license_publish_confirmation(&license.license_name),
+            )
             .await?;
 
-        self.current_message = Some(sent_message);
-        Ok(())
+        Ok(followup_message)
     }
 
     /// 保存协议并设置为默认协议
