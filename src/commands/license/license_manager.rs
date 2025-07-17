@@ -38,10 +38,18 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
         CreateSelectMenu::new("select_license", CreateSelectMenuKind::String { options })
             .placeholder("选择要设置的协议")
             .max_values(1);
-    // create the reply with the select menu
+    
+    let cancel_button = CreateButton::new("cancel_license_selection")
+        .label("❌ 取消")
+        .style(ButtonStyle::Secondary);
+    
+    // create the reply with the select menu and cancel button
     let reply = CreateReply::default()
         .embed(embed)
-        .components(vec![CreateActionRow::SelectMenu(select_menu)]);
+        .components(vec![
+            CreateActionRow::SelectMenu(select_menu),
+            CreateActionRow::Buttons(vec![cancel_button]),
+        ]);
     let reply = ctx.send(reply).await?;
     // wait for the user to select a license
     let Some(itx) = reply
@@ -54,6 +62,12 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
         warn!("Interaction timed out or was not found.");
         return Ok(());
     };
+    // 处理取消按钮
+    if itx.data.custom_id == "cancel_license_selection" {
+        itx.delete_response(&ctx.http()).await?;
+        return Ok(());
+    }
+
     // validate the interaction data
     let ComponentInteractionDataKind::StringSelect { values } = itx.data.kind.to_owned() else {
         warn!(

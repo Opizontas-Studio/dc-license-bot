@@ -194,16 +194,10 @@ impl<'a> LicenseEditor<'a> {
         Ok(())
     }
 
-    /// 清理UI
+    /// 清理UI - 删除编辑器消息
     pub async fn cleanup_ui(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
         interaction
-            .edit_response(
-                &self.serenity_ctx.http,
-                EditInteractionResponse::default()
-                    .content("编辑器已关闭。")
-                    .embeds(Vec::new())
-                    .components(Vec::new()),
-            )
+            .delete_response(&self.serenity_ctx.http)
             .await?;
 
         Ok(())
@@ -223,7 +217,7 @@ impl<'a> LicenseEditor<'a> {
                             .placeholder("输入协议名称")
                             .value(&self.core.get_state().license_name)
                             .min_length(1)
-                            .max_length(100)
+                            .max_length(50)
                             .required(true),
                     ),
                 ]);
