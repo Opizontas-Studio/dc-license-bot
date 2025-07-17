@@ -16,6 +16,7 @@ tikv-jemallocator = "0.6"
 entities = { path = "entities" }
 migration = { path = "migration" }
 arc-swap = "1"
+async-trait = "0.1"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 const_format = { version = "0.2", features = ["rust_1_83"] }

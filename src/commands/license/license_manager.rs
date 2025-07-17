@@ -1,42 +1,10 @@
-use poise::{CreateReply, Modal, command};
+use poise::{CreateReply, command};
 use serenity::all::*;
 use tracing::warn;
 
 use super::super::Context;
-use crate::{error::BotError, utils::LicenseEmbedBuilder};
+use crate::{error::BotError, utils::{LicenseEmbedBuilder, LicenseEditState, present_license_editing_panel}};
 
-#[derive(Debug, Modal)]
-#[name = "编辑协议"]
-struct EditLicenseModal {
-    #[name = "协议名称"]
-    #[placeholder = "输入协议名称"]
-    #[min_length = 1]
-    #[max_length = 100]
-    license_name: String,
-
-    #[name = "允许社区内二传（是/否）"]
-    #[placeholder = "是 或 否"]
-    #[min_length = 1]
-    #[max_length = 2]
-    allow_redistribution: String,
-
-    #[name = "允许社区内二改（是/否）"]
-    #[placeholder = "是 或 否"]
-    #[min_length = 1]
-    #[max_length = 2]
-    allow_modification: String,
-
-    #[name = "允许备份（是/否）"]
-    #[placeholder = "是 或 否"]
-    #[min_length = 1]
-    #[max_length = 2]
-    allow_backup: String,
-
-    #[name = "限制条件（可选）"]
-    #[placeholder = "输入限制条件，留空表示无限制"]
-    #[max_length = 1000]
-    restrictions_note: String,
-}
 #[command(
     slash_command,
     guild_only,
@@ -126,6 +94,9 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
     };
 
     // Create buttons for the second menu
+    let edit_btn = CreateButton::new("edit_license")
+        .label("编辑协议")
+        .style(ButtonStyle::Primary);
     let delete_btn = CreateButton::new("delete_license")
         .label("删除协议")
         .style(ButtonStyle::Danger);
@@ -140,6 +111,7 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
     let second_menu_reply = CreateReply::default()
         .embed(create_second_menu_embed(&license))
         .components(vec![CreateActionRow::Buttons(vec![
+            edit_btn.clone(),
             delete_btn.clone(),
             back_btn.clone(),
             exit_btn.clone(),
@@ -161,6 +133,84 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
     };
 
     match itx.data.custom_id.as_str() {
+        "edit_license" => {
+            // 创建编辑状态
+            let edit_state = LicenseEditState::from_existing(
+                license.license_name.clone(),
+                license.allow_redistribution,
+                license.allow_modification,
+                license.restrictions_note.clone(),
+                license.allow_backup,
+            );
+            
+            // 调用编辑器
+            match present_license_editing_panel(&ctx.serenity_context(), ctx.data(), &itx, edit_state).await {
+                Ok(Some(final_state)) => {
+                    // 用户保存了编辑，更新协议
+                    let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) = 
+                        final_state.to_user_license_fields();
+                    
+                    match db.license().update(
+                        license_id,
+                        ctx.author().id,
+                        name,
+                        allow_redistribution,
+                        allow_modification,
+                        restrictions_note,
+                        allow_backup,
+                    ).await {
+                        Ok(Some(updated_license)) => {
+                            // 更新成功，重新显示协议详情
+                            reply.edit(ctx, CreateReply::default()
+                                .embed(LicenseEmbedBuilder::create_license_detail_embed(&updated_license))
+                                .components(vec![CreateActionRow::Buttons(vec![
+                                    edit_btn.clone(),
+                                    delete_btn.clone(),
+                                    back_btn.clone(),
+                                    exit_btn.clone(),
+                                ])])
+                            ).await?;
+                        }
+                        Ok(None) => {
+                            // 协议不存在
+                            reply.edit(ctx, CreateReply::default()
+                                .content("协议不存在或更新失败。")
+                                .components(vec![])
+                            ).await?;
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            tracing::error!("更新协议失败: {}", e);
+                            reply.edit(ctx, CreateReply::default()
+                                .content("更新协议时发生错误。")
+                                .components(vec![])
+                            ).await?;
+                            return Ok(());
+                        }
+                    }
+                }
+                Ok(None) => {
+                    // 用户取消了编辑，重新显示原始协议详情
+                    reply.edit(ctx, CreateReply::default()
+                        .embed(create_second_menu_embed(&license))
+                        .components(vec![CreateActionRow::Buttons(vec![
+                            edit_btn.clone(),
+                            delete_btn.clone(),
+                            back_btn.clone(),
+                            exit_btn.clone(),
+                        ])])
+                    ).await?;
+                }
+                Err(e) => {
+                    tracing::error!("编辑协议失败: {}", e);
+                    reply.edit(ctx, CreateReply::default()
+                        .content("编辑协议时发生错误。")
+                        .components(vec![])
+                    ).await?;
+                    return Ok(());
+                }
+            }
+        }
         "delete_license" => {
             // Acknowledge interaction
             itx.create_response(ctx, CreateInteractionResponse::Acknowledge)

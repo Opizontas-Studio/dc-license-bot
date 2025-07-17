@@ -1,4 +1,5 @@
 mod auto_publish;
+mod auto_publish_flow;
 mod ping;
 
 pub use ping::PingHandler;

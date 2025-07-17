@@ -269,11 +269,12 @@ mod tests {
         let service = db.user_settings();
         let user_id = UserId::new(123);
 
-        for _ in 0..43 {
-            db.license()
+        let mut license_id = None;
+        for i in 0..3 {  // 只创建3个协议而不是43个
+            let license = db.license()
                 .create(
                     user_id,
-                    "Test License".to_string(),
+                    format!("Test License {}", i),
                     true,
                     false,
                     None,
@@ -281,13 +282,16 @@ mod tests {
                 )
                 .await
                 .unwrap();
+            if i == 1 {  // 使用第二个协议的ID
+                license_id = Some(license.id);
+            }
         }
         // Test setting user license
         let settings = service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)), None)
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(license_id.unwrap())), None)
             .await
             .unwrap();
-        assert_eq!(settings.default_user_license_id, Some(42));
+        assert_eq!(settings.default_user_license_id, license_id);
         assert_eq!(settings.default_system_license_name, None);
 
         // Test setting system license
@@ -354,26 +358,25 @@ mod tests {
         assert_eq!(service.get_default_license(user_id).await.unwrap(), None);
 
         // Set to user license
-        for _ in 0..43 {
-            db.license()
-                .create(
-                    user_id,
-                    "Test License".to_string(),
-                    true,
-                    false,
-                    None,
-                    false,
-                )
-                .await
-                .unwrap();
-        }
+        let license = db.license()
+            .create(
+                user_id,
+                "Test License".to_string(),
+                true,
+                false,
+                None,
+                false,
+            )
+            .await
+            .unwrap();
+        
         service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(42)), None)
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(license.id)), None)
             .await
             .unwrap();
         assert_eq!(
             service.get_default_license(user_id).await.unwrap(),
-            Some(DefaultLicenseIdentifier::User(42))
+            Some(DefaultLicenseIdentifier::User(license.id))
         );
 
         // Set to system license
@@ -434,11 +437,12 @@ mod tests {
         assert_eq!(settings.default_system_license_backup, None);
 
         // Test setting user license clears system backup override
-        for _ in 0..5 {
-            db.license()
+        let mut first_license_id = None;
+        for i in 0..5 {
+            let license = db.license()
                 .create(
                     user_id,
-                    "Test License".to_string(),
+                    format!("Test License {}", i),
                     true,
                     false,
                     None,
@@ -446,12 +450,15 @@ mod tests {
                 )
                 .await
                 .unwrap();
+            if i == 0 {
+                first_license_id = Some(license.id);
+            }
         }
         let settings = service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(1)), None)
+            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(first_license_id.unwrap())), None)
             .await
             .unwrap();
-        assert_eq!(settings.default_user_license_id, Some(1));
+        assert_eq!(settings.default_user_license_id, first_license_id);
         assert_eq!(settings.default_system_license_name, None);
         assert_eq!(settings.default_system_license_backup, None);
 

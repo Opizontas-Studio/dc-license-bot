@@ -26,6 +26,15 @@ impl LicenseService<'_> {
         restrictions_note: Option<String>,
         allow_backup: bool,
     ) -> Result<UserLicense, BotError> {
+        // 检查用户协议数量是否超过上限
+        let current_count = self.get_user_license_count(user_id).await?;
+        if current_count >= 5 {
+            return Err(BotError::GenericError {
+                message: "您最多只能创建5个协议，请先删除一些协议。".to_string(),
+                source: None,
+            });
+        }
+        
         let license = ActiveModel {
             user_id: Set(user_id.get() as i64),
             license_name: Set(license_name),

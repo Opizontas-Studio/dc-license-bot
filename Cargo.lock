@@ -859,6 +859,7 @@ name = "dc-bot"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "async-trait",
  "chrono",
  "clap",
  "compile-time",

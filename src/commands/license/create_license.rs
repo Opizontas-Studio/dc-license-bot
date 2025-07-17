@@ -79,28 +79,7 @@ pub async fn create_license(
     };
     match itx.data.custom_id.as_str() {
         "save_license" => {
-            // 检查用户协议数量是否超过上限
-            let current_count = ctx
-                .data()
-                .db
-                .license()
-                .get_user_license_count(ctx.author().id)
-                .await?;
-            if current_count >= 5 {
-                itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
-                    .await?;
-                reply
-                    .edit(
-                        ctx,
-                        CreateReply::default()
-                            .content("您最多只能创建5个协议,请使用`/协议管理`删除不需要的协议")
-                            .components(vec![]),
-                    )
-                    .await?;
-                return Ok(());
-            }
-
-            ctx.data()
+            let result = ctx.data()
                 .db
                 .license()
                 .create(
@@ -111,17 +90,35 @@ pub async fn create_license(
                     modal_resp.map(|m| m.restrictions),
                     backup.unwrap_or(false),
                 )
-                .await?;
-            itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
-                .await?;
-            reply
-                .edit(
-                    ctx,
-                    CreateReply::default()
-                        .content("协议已创建")
-                        .components(vec![]),
-                )
-                .await?;
+                .await;
+            
+            match result {
+                Ok(_) => {
+                    itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
+                        .await?;
+                    reply
+                        .edit(
+                            ctx,
+                            CreateReply::default()
+                                .content("协议已创建")
+                                .components(vec![]),
+                        )
+                        .await?;
+                }
+                Err(BotError::GenericError { message, .. }) => {
+                    itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
+                        .await?;
+                    reply
+                        .edit(
+                            ctx,
+                            CreateReply::default()
+                                .content(&message)
+                                .components(vec![]),
+                        )
+                        .await?;
+                }
+                Err(e) => return Err(e),
+            }
         }
         _ => {
             warn!("Unknown custom_id: {}", itx.data.custom_id);
