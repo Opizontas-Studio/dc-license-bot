@@ -95,20 +95,130 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 handler.edit(ctx, create_reply(embed)).await?;
             }
             "set_default_license" => {
+                // 获取用户协议和系统协议
+                let user_licenses = db.license().get_user_licenses(ctx.author().id).await?;
+                let system_licenses = ctx.data().system_license_cache.get_all().await;
+
+                // 创建选择菜单选项
+                let mut select_options = Vec::new();
+
+                // 添加"无默认协议"选项
+                select_options.push(
+                    CreateSelectMenuOption::new("无默认协议", "none").description("不设置默认协议"),
+                );
+
+                // 添加用户协议选项
+                for license in user_licenses {
+                    select_options.push(
+                        CreateSelectMenuOption::new(
+                            &license.license_name,
+                            format!("user_{}", license.id),
+                        )
+                        .description("用户协议"),
+                    );
+                }
+
+                // 添加系统协议选项
+                for license in system_licenses {
+                    select_options.push(
+                        CreateSelectMenuOption::new(
+                            &license.license_name,
+                            format!("system_{}", license.license_name),
+                        )
+                        .description("系统协议"),
+                    );
+                }
+
+                // 创建选择菜单
+                let select_menu = CreateSelectMenu::new(
+                    "set_default_license_select",
+                    CreateSelectMenuKind::String {
+                        options: select_options,
+                    },
+                )
+                .placeholder("请选择默认协议")
+                .max_values(1);
+
+                // 创建带有选择菜单的回复
+                let reply_with_select = CreateReply::default()
+                    .embed(create_embed().await?)
+                    .components(vec![CreateActionRow::SelectMenu(select_menu)]);
+
                 first_interaction
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
-                // TODO: 重构后需要重新实现选择菜单逻辑
-                let embed = create_embed().await?;
-                handler.edit(ctx, create_reply(embed)).await?;
+
+                handler.edit(ctx, reply_with_select).await?;
             }
             "set_default_license_select" => {
-                // TODO: 重构后需要重新实现选择处理逻辑
-                first_interaction
-                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
-                    .await?;
-                let embed = create_embed().await?;
-                handler.edit(ctx, create_reply(embed)).await?;
+                // 处理选择菜单的选择
+                if let ComponentInteractionDataKind::StringSelect { values } =
+                    &first_interaction.data.kind
+                {
+                    if let Some(selected) = values.first() {
+                        let result = if selected == "none" {
+                            // 清除默认协议
+                            db.user_settings()
+                                .set_default_license(ctx.author().id, None, None)
+                                .await
+                        } else if let Some(user_id) = selected.strip_prefix("user_") {
+                            // 设置用户协议为默认
+                            if let Ok(license_id) = user_id.parse::<i32>() {
+                                db.user_settings()
+                                    .set_default_license(
+                                        ctx.author().id,
+                                        Some(DefaultLicenseIdentifier::User(license_id)),
+                                        None,
+                                    )
+                                    .await
+                            } else {
+                                Err(BotError::GenericError {
+                                    message: "无效的协议ID".to_string(),
+                                    source: None,
+                                })
+                            }
+                        } else if let Some(system_name) = selected.strip_prefix("system_") {
+                            // 设置系统协议为默认
+                            db.user_settings()
+                                .set_default_license(
+                                    ctx.author().id,
+                                    Some(DefaultLicenseIdentifier::System(system_name.to_string())),
+                                    None,
+                                )
+                                .await
+                        } else {
+                            Err(BotError::GenericError {
+                                message: "无效的选择".to_string(),
+                                source: None,
+                            })
+                        };
+
+                        match result {
+                            Ok(_) => {
+                                first_interaction
+                                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                                    .await?;
+                                // 返回到主菜单
+                                let embed = create_embed().await?;
+                                handler.edit(ctx, create_reply(embed)).await?;
+                            }
+                            Err(e) => {
+                                tracing::error!("设置默认协议失败: {}", e);
+                                first_interaction
+                                    .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                                    .await?;
+                                let embed = create_embed().await?;
+                                handler.edit(ctx, create_reply(embed)).await?;
+                            }
+                        }
+                    }
+                } else {
+                    first_interaction
+                        .create_response(ctx, CreateInteractionResponse::Acknowledge)
+                        .await?;
+                    let embed = create_embed().await?;
+                    handler.edit(ctx, create_reply(embed)).await?;
+                }
             }
             "toggle_skip_confirmation" => {
                 db.user_settings()

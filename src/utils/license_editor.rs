@@ -258,8 +258,7 @@ impl<'a> LicenseEditor<'a> {
                             )
                             .placeholder("输入限制条件（可选）")
                             .value(
-                                self
-                                    .core
+                                self.core
                                     .get_state()
                                     .restrictions_note
                                     .clone()
