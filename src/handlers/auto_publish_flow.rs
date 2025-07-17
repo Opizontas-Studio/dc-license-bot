@@ -147,6 +147,36 @@ impl<'a> AutoPublishFlow<'a> {
         }
     }
 
+    /// 等待交互或超时结束，统一处理超时逻辑
+    async fn wait_for_interaction_or_finish(
+        &mut self,
+        timeout_secs: u64,
+    ) -> Result<Option<serenity::all::ComponentInteraction>, BotError> {
+        match self.wait_for_interaction(timeout_secs).await? {
+            Some(interaction) => Ok(Some(interaction)),
+            None => {
+                // 已经在wait_for_interaction中转换到Done状态
+                Ok(None)
+            }
+        }
+    }
+
+    /// 等待followup交互或超时结束，统一处理超时逻辑
+    async fn wait_for_followup_interaction_or_finish(
+        &self,
+        followup_message: &Message,
+        timeout_secs: u64,
+    ) -> Result<Option<serenity::all::ComponentInteraction>, BotError> {
+        match self.wait_for_followup_interaction(followup_message, timeout_secs).await? {
+            Some(interaction) => Ok(Some(interaction)),
+            None => {
+                // 超时，记录日志但不在这里转换状态（由调用者处理）
+                tracing::debug!("Followup交互超时");
+                Ok(None)
+            }
+        }
+    }
+
     /// 转换到新状态
     fn transition_to(&mut self, new_state: FlowState) {
         tracing::debug!("状态转换: {:?} -> {:?}", self.state, new_state);
@@ -379,8 +409,7 @@ impl<'a> AutoPublishFlow<'a> {
         self.current_message = Some(sent_message);
 
         // 等待用户交互
-        let Some(interaction) = self.wait_for_interaction(180).await? else {
-            // 超时已在wait_for_interaction中处理
+        let Some(interaction) = self.wait_for_interaction_or_finish(180).await? else {
             return Ok(());
         };
 
@@ -448,8 +477,7 @@ impl<'a> AutoPublishFlow<'a> {
     ) -> Result<(), BotError> {
         // 等待用户选择协议
         let followup_message = interaction.get_response(&self.ctx.http).await?;
-        let Some(select_interaction) = self.wait_for_followup_interaction(&followup_message, 120).await? else {
-            // 超时，转到完成状态
+        let Some(select_interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
             self.transition_to(FlowState::Done);
             return Ok(());
         };
@@ -608,8 +636,7 @@ impl<'a> AutoPublishFlow<'a> {
         &mut self,
         license: crate::services::license::UserLicense,
     ) -> Result<(), BotError> {
-        let Some(interaction) = self.wait_for_interaction(180).await? else {
-            // 超时已在wait_for_interaction中处理
+        let Some(interaction) = self.wait_for_interaction_or_finish(180).await? else {
             return Ok(());
         };
 
@@ -650,8 +677,7 @@ impl<'a> AutoPublishFlow<'a> {
         let mut followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
 
         // 等待用户交互 - 从followup消息等待
-        let Some(interaction) = self.wait_for_followup_interaction(&followup_message, 120).await? else {
-            // 超时，转到完成状态
+        let Some(interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
             return Ok(());
         };
 
