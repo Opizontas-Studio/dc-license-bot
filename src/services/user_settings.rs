@@ -109,7 +109,10 @@ impl UserSettingsService<'_> {
     }
 
     /// Toggle skip auto publish confirmation setting
-    pub async fn toggle_skip_confirmation(&self, user_id: UserId) -> Result<UserSettings, BotError> {
+    pub async fn toggle_skip_confirmation(
+        &self,
+        user_id: UserId,
+    ) -> Result<UserSettings, BotError> {
         let settings = self.get_or_create(user_id).await?;
         let new_skip = !settings.skip_auto_publish_confirmation;
 
@@ -141,7 +144,6 @@ impl UserSettingsService<'_> {
             Ok(None)
         }
     }
-
 
     /// Clear default license (set to None)
     pub async fn clear_default_license(&self, user_id: UserId) -> Result<UserSettings, BotError> {
@@ -270,8 +272,10 @@ mod tests {
         let user_id = UserId::new(123);
 
         let mut license_id = None;
-        for i in 0..3 {  // 只创建3个协议而不是43个
-            let license = db.license()
+        for i in 0..3 {
+            // 只创建3个协议而不是43个
+            let license = db
+                .license()
                 .create(
                     user_id,
                     format!("Test License {}", i),
@@ -282,13 +286,18 @@ mod tests {
                 )
                 .await
                 .unwrap();
-            if i == 1 {  // 使用第二个协议的ID
+            if i == 1 {
+                // 使用第二个协议的ID
                 license_id = Some(license.id);
             }
         }
         // Test setting user license
         let settings = service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(license_id.unwrap())), None)
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::User(license_id.unwrap())),
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(settings.default_user_license_id, license_id);
@@ -310,7 +319,10 @@ mod tests {
         );
 
         // Test clearing license
-        let settings = service.set_default_license(user_id, None, None).await.unwrap();
+        let settings = service
+            .set_default_license(user_id, None, None)
+            .await
+            .unwrap();
         assert_eq!(settings.default_user_license_id, None);
         assert_eq!(settings.default_system_license_name, None);
     }
@@ -358,7 +370,8 @@ mod tests {
         assert_eq!(service.get_default_license(user_id).await.unwrap(), None);
 
         // Set to user license
-        let license = db.license()
+        let license = db
+            .license()
             .create(
                 user_id,
                 "Test License".to_string(),
@@ -369,9 +382,13 @@ mod tests {
             )
             .await
             .unwrap();
-        
+
         service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(license.id)), None)
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::User(license.id)),
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(
@@ -409,7 +426,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(settings.default_system_license_name, Some("MIT".to_string()));
+        assert_eq!(
+            settings.default_system_license_name,
+            Some("MIT".to_string())
+        );
         assert_eq!(settings.default_system_license_backup, Some(true));
 
         // Test setting system license with backup override false
@@ -421,7 +441,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(settings.default_system_license_name, Some("Apache-2.0".to_string()));
+        assert_eq!(
+            settings.default_system_license_name,
+            Some("Apache-2.0".to_string())
+        );
         assert_eq!(settings.default_system_license_backup, Some(false));
 
         // Test setting system license with no backup override
@@ -433,13 +456,17 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(settings.default_system_license_name, Some("GPL-3.0".to_string()));
+        assert_eq!(
+            settings.default_system_license_name,
+            Some("GPL-3.0".to_string())
+        );
         assert_eq!(settings.default_system_license_backup, None);
 
         // Test setting user license clears system backup override
         let mut first_license_id = None;
         for i in 0..5 {
-            let license = db.license()
+            let license = db
+                .license()
                 .create(
                     user_id,
                     format!("Test License {}", i),
@@ -455,7 +482,11 @@ mod tests {
             }
         }
         let settings = service
-            .set_default_license(user_id, Some(DefaultLicenseIdentifier::User(first_license_id.unwrap())), None)
+            .set_default_license(
+                user_id,
+                Some(DefaultLicenseIdentifier::User(first_license_id.unwrap())),
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(settings.default_user_license_id, first_license_id);

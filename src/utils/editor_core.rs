@@ -1,5 +1,5 @@
+use crate::{error::BotError, types::license::SystemLicense, utils::LicenseEmbedBuilder};
 use serenity::all::*;
-use crate::{error::BotError, utils::LicenseEmbedBuilder, types::license::SystemLicense};
 
 /// 协议编辑状态，包含协议的所有可编辑字段
 #[derive(Debug, Clone)]
@@ -127,16 +127,40 @@ impl EditorCore {
             .style(ButtonStyle::Secondary);
 
         let toggle_redistribution_btn = CreateButton::new("toggle_redistribution")
-            .label(if self.state.allow_redistribution { "关闭二传" } else { "开启二传" })
-            .style(if self.state.allow_redistribution { ButtonStyle::Success } else { ButtonStyle::Secondary });
+            .label(if self.state.allow_redistribution {
+                "关闭二传"
+            } else {
+                "开启二传"
+            })
+            .style(if self.state.allow_redistribution {
+                ButtonStyle::Success
+            } else {
+                ButtonStyle::Secondary
+            });
 
         let toggle_modification_btn = CreateButton::new("toggle_modification")
-            .label(if self.state.allow_modification { "关闭二改" } else { "开启二改" })
-            .style(if self.state.allow_modification { ButtonStyle::Success } else { ButtonStyle::Secondary });
+            .label(if self.state.allow_modification {
+                "关闭二改"
+            } else {
+                "开启二改"
+            })
+            .style(if self.state.allow_modification {
+                ButtonStyle::Success
+            } else {
+                ButtonStyle::Secondary
+            });
 
         let toggle_backup_btn = CreateButton::new("toggle_backup")
-            .label(if self.state.allow_backup { "关闭备份" } else { "开启备份" })
-            .style(if self.state.allow_backup { ButtonStyle::Success } else { ButtonStyle::Secondary });
+            .label(if self.state.allow_backup {
+                "关闭备份"
+            } else {
+                "开启备份"
+            })
+            .style(if self.state.allow_backup {
+                ButtonStyle::Success
+            } else {
+                ButtonStyle::Secondary
+            });
 
         let save_btn = CreateButton::new("save_license")
             .label("保存")
@@ -148,7 +172,11 @@ impl EditorCore {
 
         // 组装按钮行
         let row1 = CreateActionRow::Buttons(vec![edit_name_btn, edit_restrictions_btn]);
-        let row2 = CreateActionRow::Buttons(vec![toggle_redistribution_btn, toggle_modification_btn, toggle_backup_btn]);
+        let row2 = CreateActionRow::Buttons(vec![
+            toggle_redistribution_btn,
+            toggle_modification_btn,
+            toggle_backup_btn,
+        ]);
         let row3 = CreateActionRow::Buttons(vec![save_btn, cancel_btn]);
 
         (embed, vec![row1, row2, row3])
@@ -163,26 +191,24 @@ impl EditorCore {
         match interaction.data.custom_id.as_str() {
             "edit_name" => {
                 // 处理编辑名称
-                let modal = CreateModal::new("edit_name_modal", "编辑协议名称")
-                    .components(vec![
-                        CreateActionRow::InputText(
-                            CreateInputText::new(
-                                InputTextStyle::Short,
-                                "协议名称",
-                                "name_input",
-                            )
+                let modal = CreateModal::new("edit_name_modal", "编辑协议名称").components(vec![
+                    CreateActionRow::InputText(
+                        CreateInputText::new(InputTextStyle::Short, "协议名称", "name_input")
                             .placeholder("输入协议名称")
                             .value(&self.state.license_name)
                             .min_length(1)
                             .max_length(100)
                             .required(true),
-                        )
-                    ]);
+                    ),
+                ]);
 
                 if let Some(modal_interaction) = ui.present_modal(interaction, modal).await? {
                     // 提取输入值
-                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction.data.components
-                        .get(0).and_then(|row| row.components.get(0))
+                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction
+                        .data
+                        .components
+                        .first()
+                        .and_then(|row| row.components.first())
                     {
                         self.state.license_name = input.value.clone().unwrap_or_default();
                     }
@@ -196,8 +222,8 @@ impl EditorCore {
             }
             "edit_restrictions" => {
                 // 处理编辑限制条件
-                let modal = CreateModal::new("edit_restrictions_modal", "编辑限制条件")
-                    .components(vec![
+                let modal =
+                    CreateModal::new("edit_restrictions_modal", "编辑限制条件").components(vec![
                         CreateActionRow::InputText(
                             CreateInputText::new(
                                 InputTextStyle::Paragraph,
@@ -205,16 +231,19 @@ impl EditorCore {
                                 "restrictions_input",
                             )
                             .placeholder("输入限制条件（可选）")
-                            .value(&self.state.restrictions_note.clone().unwrap_or_default())
+                            .value(self.state.restrictions_note.clone().unwrap_or_default())
                             .max_length(1000)
                             .required(false),
-                        )
+                        ),
                     ]);
 
                 if let Some(modal_interaction) = ui.present_modal(interaction, modal).await? {
                     // 提取输入值
-                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction.data.components
-                        .get(0).and_then(|row| row.components.get(0))
+                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction
+                        .data
+                        .components
+                        .first()
+                        .and_then(|row| row.components.first())
                     {
                         let value = input.value.clone().unwrap_or_default();
                         self.state.restrictions_note = if value.trim().is_empty() {
@@ -288,7 +317,10 @@ mod tests {
         assert_eq!(state.license_name, "Existing License");
         assert!(state.allow_redistribution);
         assert!(!state.allow_modification);
-        assert_eq!(state.restrictions_note, Some("Some restrictions".to_string()));
+        assert_eq!(
+            state.restrictions_note,
+            Some("Some restrictions".to_string())
+        );
         assert!(state.allow_backup);
     }
 
@@ -297,7 +329,7 @@ mod tests {
         let state = LicenseEditState::new("Test License".to_string());
         let core = EditorCore::new(state);
         let (_embed, components) = core.build_ui();
-        
+
         assert_eq!(components.len(), 3); // 3 rows of buttons
         // 验证embed已创建，无需检查内部字段
         // 因为CreateEmbed的字段可能是私有的

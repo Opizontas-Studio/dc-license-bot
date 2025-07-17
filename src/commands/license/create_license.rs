@@ -79,7 +79,8 @@ pub async fn create_license(
     };
     match itx.data.custom_id.as_str() {
         "save_license" => {
-            let result = ctx.data()
+            let result = ctx
+                .data()
                 .db
                 .license()
                 .create(
@@ -91,7 +92,7 @@ pub async fn create_license(
                     backup.unwrap_or(false),
                 )
                 .await;
-            
+
             match result {
                 Ok(_) => {
                     itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
@@ -111,9 +112,7 @@ pub async fn create_license(
                     reply
                         .edit(
                             ctx,
-                            CreateReply::default()
-                                .content(&message)
-                                .components(vec![]),
+                            CreateReply::default().content(&message).components(vec![]),
                         )
                         .await?;
                 }

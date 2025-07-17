@@ -69,12 +69,9 @@ impl LicensePublishService {
             .await
             .map(|m| m.display_name().to_string())
             .unwrap_or_else(|_| author.display_name().to_string());
-            
-        let license_embed = LicenseEmbedBuilder::create_license_embed(
-            license,
-            backup_allowed,
-            &display_name,
-        );
+
+        let license_embed =
+            LicenseEmbedBuilder::create_license_embed(license, backup_allowed, &display_name);
         let new_msg = ChannelId::new(thread.id.get())
             .send_message(http, CreateMessage::new().embed(license_embed))
             .await?;

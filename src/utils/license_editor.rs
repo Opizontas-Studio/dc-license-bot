@@ -1,23 +1,19 @@
 use serenity::all::*;
 use tracing::warn;
 
-use crate::{error::BotError, commands::Data};
-use super::editor_core::{LicenseEditState, EditorCore, UIProvider};
-
-
-
-
+use super::editor_core::{EditorCore, LicenseEditState, UIProvider};
+use crate::{commands::Data, error::BotError};
 
 /// 协议编辑面板
-/// 
+///
 /// 这个函数提供完整的协议编辑功能
-/// 
+///
 /// # 参数
 /// - `serenity_ctx`: Serenity 上下文
 /// - `data`: 应用数据
 /// - `interaction`: 组件交互
 /// - `initial_state`: 初始编辑状态
-/// 
+///
 /// # 返回值
 /// - `Some(LicenseEditState)`: 用户保存的最终状态
 /// - `None`: 用户取消了编辑
@@ -29,10 +25,10 @@ pub async fn present_license_editing_panel(
 ) -> Result<Option<LicenseEditState>, BotError> {
     // 创建编辑器状态
     let mut editor_state = LicenseEditor::new(serenity_ctx, data, initial_state);
-    
+
     // 发送初始编辑界面
     editor_state.send_initial_ui(interaction).await?;
-    
+
     // 主编辑循环
     loop {
         // 等待用户交互
@@ -51,7 +47,7 @@ pub async fn present_license_editing_panel(
 
         // 处理交互
         let should_exit = editor_state.handle_interaction(&edit_interaction).await?;
-        
+
         if should_exit {
             // 检查是否是保存操作
             if edit_interaction.data.custom_id == "save_license" {
@@ -77,13 +73,17 @@ pub struct LicenseEditor<'a> {
 }
 
 impl<'a> LicenseEditor<'a> {
-    pub fn new(serenity_ctx: &'a serenity::all::Context, _data: &'a Data, state: LicenseEditState) -> Self {
+    pub fn new(
+        serenity_ctx: &'a serenity::all::Context,
+        _data: &'a Data,
+        state: LicenseEditState,
+    ) -> Self {
         Self {
             serenity_ctx,
             core: EditorCore::new(state),
         }
     }
-    
+
     pub fn get_state(&self) -> &LicenseEditState {
         self.core.get_state()
     }
@@ -97,10 +97,12 @@ impl<'a> UIProvider for LicenseEditor<'a> {
         interaction: &ComponentInteraction,
         modal: CreateModal,
     ) -> Result<Option<ModalInteraction>, BotError> {
-        interaction.create_response(
-            &self.serenity_ctx.http,
-            CreateInteractionResponse::Modal(modal),
-        ).await?;
+        interaction
+            .create_response(
+                &self.serenity_ctx.http,
+                CreateInteractionResponse::Modal(modal),
+            )
+            .await?;
 
         // 等待 Modal 提交
         if let Some(modal_interaction) = interaction
@@ -111,10 +113,12 @@ impl<'a> UIProvider for LicenseEditor<'a> {
             .await
         {
             // 确认响应
-            modal_interaction.create_response(
-                &self.serenity_ctx.http,
-                CreateInteractionResponse::Acknowledge,
-            ).await?;
+            modal_interaction
+                .create_response(
+                    &self.serenity_ctx.http,
+                    CreateInteractionResponse::Acknowledge,
+                )
+                .await?;
 
             Ok(Some(modal_interaction))
         } else {
@@ -125,7 +129,9 @@ impl<'a> UIProvider for LicenseEditor<'a> {
 
     /// 确认交互
     async fn acknowledge(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
-        interaction.create_response(self.serenity_ctx, CreateInteractionResponse::Acknowledge).await?;
+        interaction
+            .create_response(self.serenity_ctx, CreateInteractionResponse::Acknowledge)
+            .await?;
         Ok(())
     }
 
@@ -141,7 +147,7 @@ impl<'a> UIProvider for LicenseEditor<'a> {
                 &self.serenity_ctx.http,
                 EditInteractionResponse::new()
                     .embed(embed)
-                    .components(components)
+                    .components(components),
             )
             .await?;
         Ok(())
@@ -150,9 +156,12 @@ impl<'a> UIProvider for LicenseEditor<'a> {
 
 impl<'a> LicenseEditor<'a> {
     /// 发送初始编辑界面
-    pub async fn send_initial_ui(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
+    pub async fn send_initial_ui(
+        &self,
+        interaction: &ComponentInteraction,
+    ) -> Result<(), BotError> {
         let (embed, components) = self.core.build_ui();
-        
+
         interaction
             .create_response(
                 &self.serenity_ctx.http,
@@ -164,14 +173,14 @@ impl<'a> LicenseEditor<'a> {
                 ),
             )
             .await?;
-        
+
         Ok(())
     }
-    
+
     /// 更新编辑界面
     pub async fn update_ui(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
         let (embed, components) = self.core.build_ui();
-        
+
         interaction
             .edit_response(
                 &self.serenity_ctx.http,
@@ -180,10 +189,10 @@ impl<'a> LicenseEditor<'a> {
                     .components(components),
             )
             .await?;
-        
+
         Ok(())
     }
-    
+
     /// 清理UI
     pub async fn cleanup_ui(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
         interaction
@@ -195,37 +204,39 @@ impl<'a> LicenseEditor<'a> {
                     .components(Vec::new()),
             )
             .await?;
-        
+
         Ok(())
     }
-    
+
     /// 处理用户交互
-    pub async fn handle_interaction(&mut self, interaction: &ComponentInteraction) -> Result<bool, BotError> {
+    pub async fn handle_interaction(
+        &mut self,
+        interaction: &ComponentInteraction,
+    ) -> Result<bool, BotError> {
         match interaction.data.custom_id.as_str() {
             "edit_name" => {
                 // 处理编辑名称
-                let modal = CreateModal::new("edit_name_modal", "编辑协议名称")
-                    .components(vec![
-                        CreateActionRow::InputText(
-                            CreateInputText::new(
-                                InputTextStyle::Short,
-                                "协议名称",
-                                "name_input",
-                            )
+                let modal = CreateModal::new("edit_name_modal", "编辑协议名称").components(vec![
+                    CreateActionRow::InputText(
+                        CreateInputText::new(InputTextStyle::Short, "协议名称", "name_input")
                             .placeholder("输入协议名称")
                             .value(&self.core.get_state().license_name)
                             .min_length(1)
                             .max_length(100)
                             .required(true),
-                        )
-                    ]);
+                    ),
+                ]);
 
                 if let Some(modal_interaction) = self.present_modal(interaction, modal).await? {
                     // 提取输入值
-                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction.data.components
-                        .get(0).and_then(|row| row.components.get(0))
+                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction
+                        .data
+                        .components
+                        .first()
+                        .and_then(|row| row.components.first())
                     {
-                        self.core.get_state_mut().license_name = input.value.clone().unwrap_or_default();
+                        self.core.get_state_mut().license_name =
+                            input.value.clone().unwrap_or_default();
                     }
                 }
 
@@ -237,8 +248,8 @@ impl<'a> LicenseEditor<'a> {
             }
             "edit_restrictions" => {
                 // 处理编辑限制条件
-                let modal = CreateModal::new("edit_restrictions_modal", "编辑限制条件")
-                    .components(vec![
+                let modal =
+                    CreateModal::new("edit_restrictions_modal", "编辑限制条件").components(vec![
                         CreateActionRow::InputText(
                             CreateInputText::new(
                                 InputTextStyle::Paragraph,
@@ -246,16 +257,26 @@ impl<'a> LicenseEditor<'a> {
                                 "restrictions_input",
                             )
                             .placeholder("输入限制条件（可选）")
-                            .value(&self.core.get_state().restrictions_note.clone().unwrap_or_default())
+                            .value(
+                                self
+                                    .core
+                                    .get_state()
+                                    .restrictions_note
+                                    .clone()
+                                    .unwrap_or_default(),
+                            )
                             .max_length(1000)
                             .required(false),
-                        )
+                        ),
                     ]);
 
                 if let Some(modal_interaction) = self.present_modal(interaction, modal).await? {
                     // 提取输入值
-                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction.data.components
-                        .get(0).and_then(|row| row.components.get(0))
+                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction
+                        .data
+                        .components
+                        .first()
+                        .and_then(|row| row.components.first())
                     {
                         let value = input.value.clone().unwrap_or_default();
                         self.core.get_state_mut().restrictions_note = if value.trim().is_empty() {
@@ -274,12 +295,14 @@ impl<'a> LicenseEditor<'a> {
             }
             "toggle_redistribution" => {
                 self.acknowledge(interaction).await?;
-                self.core.get_state_mut().allow_redistribution = !self.core.get_state().allow_redistribution;
+                self.core.get_state_mut().allow_redistribution =
+                    !self.core.get_state().allow_redistribution;
                 Ok(false) // 继续编辑
             }
             "toggle_modification" => {
                 self.acknowledge(interaction).await?;
-                self.core.get_state_mut().allow_modification = !self.core.get_state().allow_modification;
+                self.core.get_state_mut().allow_modification =
+                    !self.core.get_state().allow_modification;
                 Ok(false) // 继续编辑
             }
             "toggle_backup" => {

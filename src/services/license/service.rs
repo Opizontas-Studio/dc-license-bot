@@ -34,7 +34,7 @@ impl LicenseService<'_> {
                 source: None,
             });
         }
-        
+
         let license = ActiveModel {
             user_id: Set(user_id.get() as i64),
             license_name: Set(license_name),
@@ -77,6 +77,7 @@ impl LicenseService<'_> {
     }
 
     /// Update a user license
+    #[allow(clippy::too_many_arguments)]
     pub async fn update(
         &self,
         license_id: i32,

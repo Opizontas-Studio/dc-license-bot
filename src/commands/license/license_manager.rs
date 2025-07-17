@@ -3,7 +3,10 @@ use serenity::all::*;
 use tracing::warn;
 
 use super::super::Context;
-use crate::{error::BotError, utils::{LicenseEmbedBuilder, LicenseEditState, present_license_editing_panel}};
+use crate::{
+    error::BotError,
+    utils::{LicenseEditState, LicenseEmbedBuilder, present_license_editing_panel},
+};
 
 #[command(
     slash_command,
@@ -142,71 +145,109 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                 license.restrictions_note.clone(),
                 license.allow_backup,
             );
-            
+
             // 调用编辑器
-            match present_license_editing_panel(&ctx.serenity_context(), ctx.data(), &itx, edit_state).await {
+            match present_license_editing_panel(
+                ctx.serenity_context(),
+                ctx.data(),
+                &itx,
+                edit_state,
+            )
+            .await
+            {
                 Ok(Some(final_state)) => {
                     // 用户保存了编辑，更新协议
-                    let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) = 
-                        final_state.to_user_license_fields();
-                    
-                    match db.license().update(
-                        license_id,
-                        ctx.author().id,
+                    let (
                         name,
                         allow_redistribution,
                         allow_modification,
                         restrictions_note,
                         allow_backup,
-                    ).await {
+                    ) = final_state.to_user_license_fields();
+
+                    match db
+                        .license()
+                        .update(
+                            license_id,
+                            ctx.author().id,
+                            name,
+                            allow_redistribution,
+                            allow_modification,
+                            restrictions_note,
+                            allow_backup,
+                        )
+                        .await
+                    {
                         Ok(Some(updated_license)) => {
                             // 更新成功，重新显示协议详情
-                            reply.edit(ctx, CreateReply::default()
-                                .embed(LicenseEmbedBuilder::create_license_detail_embed(&updated_license))
-                                .components(vec![CreateActionRow::Buttons(vec![
-                                    edit_btn.clone(),
-                                    delete_btn.clone(),
-                                    back_btn.clone(),
-                                    exit_btn.clone(),
-                                ])])
-                            ).await?;
+                            reply
+                                .edit(
+                                    ctx,
+                                    CreateReply::default()
+                                        .embed(LicenseEmbedBuilder::create_license_detail_embed(
+                                            &updated_license,
+                                        ))
+                                        .components(vec![CreateActionRow::Buttons(vec![
+                                            edit_btn.clone(),
+                                            delete_btn.clone(),
+                                            back_btn.clone(),
+                                            exit_btn.clone(),
+                                        ])]),
+                                )
+                                .await?;
                         }
                         Ok(None) => {
                             // 协议不存在
-                            reply.edit(ctx, CreateReply::default()
-                                .content("协议不存在或更新失败。")
-                                .components(vec![])
-                            ).await?;
+                            reply
+                                .edit(
+                                    ctx,
+                                    CreateReply::default()
+                                        .content("协议不存在或更新失败。")
+                                        .components(vec![]),
+                                )
+                                .await?;
                             return Ok(());
                         }
                         Err(e) => {
                             tracing::error!("更新协议失败: {}", e);
-                            reply.edit(ctx, CreateReply::default()
-                                .content("更新协议时发生错误。")
-                                .components(vec![])
-                            ).await?;
+                            reply
+                                .edit(
+                                    ctx,
+                                    CreateReply::default()
+                                        .content("更新协议时发生错误。")
+                                        .components(vec![]),
+                                )
+                                .await?;
                             return Ok(());
                         }
                     }
                 }
                 Ok(None) => {
                     // 用户取消了编辑，重新显示原始协议详情
-                    reply.edit(ctx, CreateReply::default()
-                        .embed(create_second_menu_embed(&license))
-                        .components(vec![CreateActionRow::Buttons(vec![
-                            edit_btn.clone(),
-                            delete_btn.clone(),
-                            back_btn.clone(),
-                            exit_btn.clone(),
-                        ])])
-                    ).await?;
+                    reply
+                        .edit(
+                            ctx,
+                            CreateReply::default()
+                                .embed(create_second_menu_embed(&license))
+                                .components(vec![CreateActionRow::Buttons(vec![
+                                    edit_btn.clone(),
+                                    delete_btn.clone(),
+                                    back_btn.clone(),
+                                    exit_btn.clone(),
+                                ])]),
+                        )
+                        .await?;
                 }
                 Err(e) => {
                     tracing::error!("编辑协议失败: {}", e);
-                    reply.edit(ctx, CreateReply::default()
-                        .content("编辑协议时发生错误。")
-                        .components(vec![])
-                    ).await?;
+                    reply
+                        .edit(
+                            ctx,
+                            CreateReply::default()
+                                .content("编辑协议时发生错误。")
+                                .components(vec![]),
+                        )
+                        .await?;
                     return Ok(());
                 }
             }

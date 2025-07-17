@@ -4,8 +4,7 @@ use serenity::all::*;
 
 use super::super::Context;
 use crate::{
-    error::BotError, types::license::DefaultLicenseIdentifier, 
-    utils::LicenseEmbedBuilder,
+    error::BotError, types::license::DefaultLicenseIdentifier, utils::LicenseEmbedBuilder,
 };
 
 #[command(

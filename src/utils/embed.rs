@@ -110,7 +110,11 @@ impl LicenseEmbedBuilder {
             .field("默认协议", license_name, true)
             .field(
                 "跳过确认",
-                if skip_confirmation { "启用" } else { "禁用" },
+                if skip_confirmation {
+                    "启用"
+                } else {
+                    "禁用"
+                },
                 true,
             )
             .colour(if auto_copyright {
