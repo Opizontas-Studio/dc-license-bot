@@ -167,6 +167,7 @@ impl<'a> LicenseEditor<'a> {
                 &self.serenity_ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
+                        .content("⚠️ **重要提示：点击'编辑名称'或'编辑限制条件'将弹出输入窗口。由于Discord限制，直接关闭该窗口将导致此面板失效，需要重新开始。**")
                         .embed(embed)
                         .components(components)
                         .ephemeral(true),
