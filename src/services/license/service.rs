@@ -1,6 +1,6 @@
 use chrono::Utc;
 use entities::user_licenses::*;
-use sea_orm::{QueryOrder, QuerySelect, Set, prelude::*};
+use sea_orm::{QueryOrder, QuerySelect, Set, prelude::*, sea_query::Expr};
 use serenity::all::*;
 
 use super::types::UserLicense;
@@ -76,7 +76,7 @@ impl LicenseService<'_> {
             .await?)
     }
 
-    /// Update a user license
+    /// Update a user license (atomic operation)
     #[allow(clippy::too_many_arguments)]
     pub async fn update(
         &self,
@@ -88,25 +88,24 @@ impl LicenseService<'_> {
         restrictions_note: Option<String>,
         allow_backup: bool,
     ) -> Result<Option<UserLicense>, BotError> {
-        let license = Entity::find()
+        // 执行原子更新
+        let update_result = Entity::update_many()
+            .col_expr(Column::LicenseName, Expr::value(license_name))
+            .col_expr(Column::AllowRedistribution, Expr::value(allow_redistribution))
+            .col_expr(Column::AllowModification, Expr::value(allow_modification))
+            .col_expr(Column::RestrictionsNote, Expr::value(restrictions_note))
+            .col_expr(Column::AllowBackup, Expr::value(allow_backup))
             .filter(
                 Column::Id
                     .eq(license_id)
                     .and(Column::UserId.eq(user_id.get() as i64)),
             )
-            .one(self.0.inner())
+            .exec(self.0.inner())
             .await?;
 
-        if let Some(license) = license {
-            let mut active_license: ActiveModel = license.into();
-            active_license.license_name = Set(license_name);
-            active_license.allow_redistribution = Set(allow_redistribution);
-            active_license.allow_modification = Set(allow_modification);
-            active_license.restrictions_note = Set(restrictions_note);
-            active_license.allow_backup = Set(allow_backup);
-
-            let updated = active_license.update(self.0.inner()).await?;
-            Ok(Some(updated))
+        // 如果更新成功，获取更新后的记录
+        if update_result.rows_affected > 0 {
+            self.get_license(license_id, user_id).await
         } else {
             Ok(None)
         }
@@ -134,22 +133,20 @@ impl LicenseService<'_> {
             .await?)
     }
 
-    /// Increment usage count for a license
+    /// Increment usage count for a license (atomic operation)
     pub async fn increment_usage(&self, license_id: i32, user_id: UserId) -> Result<(), BotError> {
-        let license = Entity::find()
+        Entity::update_many()
+            .col_expr(
+                Column::UsageCount,
+                Expr::col(Column::UsageCount).add(1),
+            )
             .filter(
                 Column::Id
                     .eq(license_id)
                     .and(Column::UserId.eq(user_id.get() as i64)),
             )
-            .one(self.0.inner())
+            .exec(self.0.inner())
             .await?;
-
-        if let Some(license) = license {
-            let mut active_license: ActiveModel = license.into();
-            active_license.usage_count = Set(active_license.usage_count.unwrap() + 1);
-            active_license.update(self.0.inner()).await?;
-        }
 
         Ok(())
     }
