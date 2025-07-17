@@ -77,72 +77,45 @@ impl<'a> AutoPublishFlow<'a> {
         loop {
             tracing::debug!("处理状态: {:?}", self.state);
 
-            match self.state {
+            let result = match self.state {
                 FlowState::Initial => {
-                    // 初始状态 - 检查用户设置并决定后续流程
-                    if let Err(e) = self.handle_initial_state().await {
-                        tracing::error!("初始状态处理错误: {}", e);
-                        self.cleanup().await;
-                        return Err(e);
-                    }
+                    self.handle_initial_state().await
                 }
                 FlowState::AwaitingGuidance => {
-                    // 等待新用户选择启用/禁用
-                    match self.handle_awaiting_guidance().await {
-                        Ok(()) => {} // 继续到下一个状态
-                        Err(e) => {
-                            tracing::error!("等待引导状态处理错误: {}", e);
-                            self.cleanup().await;
-                            return Err(e);
-                        }
-                    }
+                    self.handle_awaiting_guidance().await
                 }
                 FlowState::EditingLicense(ref edit_state) => {
-                    // 编辑协议
                     let edit_state = edit_state.clone();
-                    match self.handle_editing_license(edit_state).await {
-                        Ok(()) => {} // 继续到下一个状态
-                        Err(e) => {
-                            tracing::error!("编辑协议状态处理错误: {}", e);
-                            self.cleanup().await;
-                            return Err(e);
-                        }
-                    }
+                    self.handle_editing_license(edit_state).await
                 }
                 FlowState::ConfirmingSave(ref license) => {
-                    // 确认保存协议
                     let license = license.clone();
-                    match self.handle_confirming_save(license).await {
-                        Ok(()) => {} // 继续到下一个状态
-                        Err(e) => {
-                            tracing::error!("确认保存状态处理错误: {}", e);
-                            self.cleanup().await;
-                            return Err(e);
-                        }
-                    }
+                    self.handle_confirming_save(license).await
                 }
                 FlowState::ConfirmingPublish(ref license) => {
-                    // 确认发布协议
                     let license = license.clone();
-                    match self.handle_confirming_publish(license).await {
-                        Ok(()) => {} // 继续到下一个状态
-                        Err(e) => {
-                            tracing::error!("确认发布状态处理错误: {}", e);
-                            self.cleanup().await;
-                            return Err(e);
-                        }
-                    }
+                    self.handle_confirming_publish(license).await
                 }
                 FlowState::Done => {
-                    // 完成状态，退出循环
                     break;
                 }
+            };
+
+            if let Err(e) = result {
+                self.handle_state_error(&e).await;
+                return Err(e);
             }
         }
 
         // 正常完成，清理资源
         self.cleanup().await;
         Ok(())
+    }
+
+    /// 统一的状态错误处理
+    async fn handle_state_error(&mut self, error: &BotError) {
+        tracing::error!("状态机处理错误: {}", error);
+        self.cleanup().await;
     }
 
     /// 等待用户交互，统一的交互处理方法
@@ -188,6 +161,79 @@ impl<'a> AutoPublishFlow<'a> {
             // 只删除确认类型的消息，其他消息保留作为状态记录
             let _ = message.delete(&self.ctx.http).await;
         }
+    }
+
+    /// 统一的成功响应方法
+    async fn respond_with_success(
+        &self,
+        interaction: &serenity::all::ComponentInteraction,
+        message: &str,
+    ) -> Result<(), BotError> {
+        interaction
+            .create_response(
+                &self.ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(message)
+                        .ephemeral(true),
+                ),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// 统一的错误followup方法
+    async fn followup_with_error(
+        &self,
+        interaction: &serenity::all::ComponentInteraction,
+        message: &str,
+    ) -> Result<(), BotError> {
+        interaction
+            .create_followup(
+                &self.ctx.http,
+                CreateInteractionResponseFollowup::new()
+                    .content(format!("❌ {message}"))
+                    .ephemeral(true),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// 清理消息并响应
+    async fn cleanup_message_and_respond(
+        &mut self,
+        interaction: &serenity::all::ComponentInteraction,
+        response: CreateInteractionResponseMessage,
+    ) -> Result<(), BotError> {
+        // 删除当前消息
+        if let Some(message) = &self.current_message {
+            let _ = message.delete(&self.ctx.http).await;
+        }
+        self.current_message = None;
+
+        // 响应交互
+        interaction
+            .create_response(
+                &self.ctx.http,
+                CreateInteractionResponse::Message(response),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// 从followup消息等待交互
+    async fn wait_for_followup_interaction(
+        &self,
+        followup_message: &Message,
+        timeout_secs: u64,
+    ) -> Result<Option<serenity::all::ComponentInteraction>, BotError> {
+        let interaction = followup_message
+            .await_component_interaction(&self.ctx.shard)
+            .author_id(self.owner_id)
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .await;
+
+        Ok(interaction)
     }
 
     /// 处理初始状态 - 检查用户设置并决定后续流程
@@ -340,106 +386,146 @@ impl<'a> AutoPublishFlow<'a> {
 
         match interaction.data.custom_id.as_str() {
             "enable_auto_publish_setup" => {
-                // 用户选择启用功能
-                self.data
-                    .db()
-                    .user_settings()
-                    .set_auto_publish(self.owner_id, true)
-                    .await?;
-
-                // 获取协议数据
-                let system_licenses = self.data.system_license_cache().get_all().await;
-                self.system_licenses = Some(system_licenses.clone());
-
-                // 使用UI构建器创建选择菜单
-                let select_menu = AutoPublishUI::build_license_selection_menu(&system_licenses);
-
-                // 立即确认交互并附加选择菜单 - 全部 ephemeral
-                interaction
-                    .create_response(
-                        &self.ctx.http,
-                        CreateInteractionResponse::Message(
-                            AutoPublishUI::create_enable_response(select_menu)
-                        ),
-                    )
-                    .await?;
-
-                // 删除旧的引导消息
-                if let Some(message) = &self.current_message {
-                    let _ = message.delete(&self.ctx.http).await;
-                    self.current_message = None;
-                }
-
-                // 等待用户选择协议 - 直接在这里处理
-                let Some(select_interaction) = interaction
-                    .get_response(&self.ctx.http)
-                    .await?
-                    .await_component_interaction(&self.ctx.shard)
-                    .author_id(self.owner_id)
-                    .timeout(std::time::Duration::from_secs(120))
-                    .await
-                else {
-                    // 超时，转到完成状态
-                    self.transition_to(FlowState::Done);
-                    return Ok(());
-                };
-
-                // 处理用户选择
-                if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
-                    if let Some(selected) = values.first() {
-                        let initial_state = if selected == "new_license" {
-                            LicenseEditState::new("新协议".to_string())
-                        } else if let Some(system_name) = selected.strip_prefix("system_") {
-                            if let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) {
-                                LicenseEditState::from_system_license(system_license)
-                            } else {
-                                return Err(BotError::GenericError {
-                                    message: "选择的系统协议不存在".to_string(),
-                                    source: None,
-                                });
-                            }
-                        } else {
-                            return Err(BotError::GenericError {
-                                message: "无效的选择".to_string(),
-                                source: None,
-                            });
-                        };
-
-                        // 保存选择交互并转换状态
-                        self.pending_interaction = Some(select_interaction);
-                        self.transition_to(FlowState::EditingLicense(initial_state));
-                    } else {
-                        self.transition_to(FlowState::Done);
-                    }
-                } else {
-                    self.transition_to(FlowState::Done);
-                }
+                self.handle_enable_setup(interaction).await?;
             }
             "disable_auto_publish_setup" => {
-                // 用户选择关闭功能
-                self.data
-                    .db()
-                    .user_settings()
-                    .set_auto_publish(self.owner_id, false)
-                    .await?;
-
-                // 礼貌回复
-                interaction
-                    .create_response(
-                        &self.ctx.http,
-                        CreateInteractionResponse::Message(
-                            AutoPublishUI::create_disable_response()
-                        ),
-                    )
-                    .await?;
-
-                self.transition_to(FlowState::Done);
+                self.handle_disable_setup(interaction).await?;
             }
             _ => {
                 self.transition_to(FlowState::Done);
             }
         }
 
+        Ok(())
+    }
+
+    /// 处理启用自动发布设置
+    async fn handle_enable_setup(
+        &mut self,
+        interaction: serenity::all::ComponentInteraction,
+    ) -> Result<(), BotError> {
+        // 启用自动发布功能
+        self.data
+            .db()
+            .user_settings()
+            .set_auto_publish(self.owner_id, true)
+            .await?;
+
+        // 获取协议数据
+        let system_licenses = self.data.system_license_cache().get_all().await;
+        self.system_licenses = Some(system_licenses.clone());
+
+        // 使用UI构建器创建选择菜单
+        let select_menu = AutoPublishUI::build_license_selection_menu(&system_licenses);
+
+        // 立即确认交互并附加选择菜单 - 全部 ephemeral
+        interaction
+            .create_response(
+                &self.ctx.http,
+                CreateInteractionResponse::Message(
+                    AutoPublishUI::create_enable_response(select_menu)
+                ),
+            )
+            .await?;
+
+        // 删除旧的引导消息
+        if let Some(message) = &self.current_message {
+            let _ = message.delete(&self.ctx.http).await;
+            self.current_message = None;
+        }
+
+        // 等待用户选择协议
+        self.handle_license_selection(interaction, system_licenses).await?;
+        
+        Ok(())
+    }
+
+    /// 处理协议选择
+    async fn handle_license_selection(
+        &mut self,
+        interaction: serenity::all::ComponentInteraction,
+        system_licenses: Vec<crate::types::license::SystemLicense>,
+    ) -> Result<(), BotError> {
+        // 等待用户选择协议
+        let Some(select_interaction) = interaction
+            .get_response(&self.ctx.http)
+            .await?
+            .await_component_interaction(&self.ctx.shard)
+            .author_id(self.owner_id)
+            .timeout(std::time::Duration::from_secs(120))
+            .await
+        else {
+            // 超时，转到完成状态
+            self.transition_to(FlowState::Done);
+            return Ok(());
+        };
+
+        // 处理用户选择
+        if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
+            if let Some(selected) = values.first() {
+                let initial_state = self.create_license_edit_state(selected, &system_licenses)?;
+                
+                // 保存选择交互并转换状态
+                self.pending_interaction = Some(select_interaction);
+                self.transition_to(FlowState::EditingLicense(initial_state));
+            } else {
+                self.transition_to(FlowState::Done);
+            }
+        } else {
+            self.transition_to(FlowState::Done);
+        }
+
+        Ok(())
+    }
+
+    /// 根据选择创建编辑状态
+    fn create_license_edit_state(
+        &self,
+        selected: &str,
+        system_licenses: &[crate::types::license::SystemLicense],
+    ) -> Result<LicenseEditState, BotError> {
+        if selected == "new_license" {
+            Ok(LicenseEditState::new("新协议".to_string()))
+        } else if let Some(system_name) = selected.strip_prefix("system_") {
+            if let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) {
+                Ok(LicenseEditState::from_system_license(system_license))
+            } else {
+                Err(BotError::GenericError {
+                    message: "选择的系统协议不存在".to_string(),
+                    source: None,
+                })
+            }
+        } else {
+            Err(BotError::GenericError {
+                message: "无效的选择".to_string(),
+                source: None,
+            })
+        }
+    }
+
+    /// 处理禁用自动发布设置
+    async fn handle_disable_setup(
+        &mut self,
+        interaction: serenity::all::ComponentInteraction,
+    ) -> Result<(), BotError> {
+        // 禁用自动发布功能
+        self.data
+            .db()
+            .user_settings()
+            .set_auto_publish(self.owner_id, false)
+            .await?;
+
+        // 礼貌回复
+        interaction
+            .create_response(
+                &self.ctx.http,
+                CreateInteractionResponse::Message(
+                    AutoPublishUI::create_disable_response()
+                ),
+            )
+            .await?;
+
+        self.transition_to(FlowState::Done);
         Ok(())
     }
 
@@ -470,14 +556,7 @@ impl<'a> AutoPublishFlow<'a> {
                     Err(e) => {
                         tracing::error!("保存协议失败: {}", e);
                         // 发送错误消息
-                        interaction
-                            .create_followup(
-                                &self.ctx.http,
-                                CreateInteractionResponseFollowup::new()
-                                    .content("❌ 协议保存失败，请稍后重试。")
-                                    .ephemeral(true),
-                            )
-                            .await?;
+                        self.followup_with_error(&interaction, "协议保存失败，请稍后重试。").await?;
                         self.transition_to(FlowState::Done);
                     }
                 }
@@ -517,129 +596,127 @@ impl<'a> AutoPublishFlow<'a> {
         &mut self,
         license: crate::services::license::UserLicense,
     ) -> Result<(), BotError> {
-        // 如果是来自初始状态的确认发布，需要等待用户交互
-        if let Some(_message) = &self.current_message {
-            let Some(interaction) = self.wait_for_interaction(180).await? else {
-                // 超时已在wait_for_interaction中处理
-                return Ok(());
-            };
-
-            match interaction.data.custom_id.as_str() {
-                "confirm_auto_publish" => {
-                    // 确认发布
-                    self.publish_license_directly(&license).await?;
-
-                    // 删除交互面板
-                    if let Some(message) = &self.current_message {
-                        let _ = message.delete(&self.ctx.http).await;
-                    }
-                    self.current_message = None;
-
-                    // 回应交互
-                    interaction
-                        .create_response(
-                            &self.ctx.http,
-                            CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("✅ 协议已成功发布！")
-                                    .ephemeral(true),
-                            ),
-                        )
-                        .await?;
-                }
-                "cancel_auto_publish" => {
-                    // 取消发布
-                    if let Some(message) = &self.current_message {
-                        let _ = message.delete(&self.ctx.http).await;
-                    }
-                    self.current_message = None;
-
-                    // 回应交互
-                    interaction
-                        .create_response(
-                            &self.ctx.http,
-                            CreateInteractionResponse::Message(
-                                AutoPublishUI::create_publish_cancel_response()
-                            ),
-                        )
-                        .await?;
-                }
-                _ => {}
-            }
+        // 判断是来自初始状态还是新用户流程
+        if self.current_message.is_some() {
+            // 来自初始状态的确认发布
+            self.handle_existing_user_publish_confirmation(license).await?;
         } else {
             // 来自新用户流程的发布确认
-            let editor_interaction = self.editor_interaction.take().ok_or_else(|| BotError::GenericError {
-                message: "没有可用的编辑器交互来显示确认".to_string(),
-                source: None,
-            })?;
-            
-            let mut followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
-
-            // 等待用户交互 - 从followup消息等待
-            let Some(interaction) = followup_message
-                .await_component_interaction(&self.ctx.shard)
-                .author_id(self.owner_id)
-                .timeout(std::time::Duration::from_secs(120))
-                .await
-            else {
-                // 超时，转到完成状态
-                self.transition_to(FlowState::Done);
-                return Ok(());
-            };
-
-            match interaction.data.custom_id.as_str() {
-                "confirm_publish_new_license" => {
-                    // 发布协议
-                    self.publish_license_directly(&license).await?;
-
-                    // 确认发布成功
-                    interaction
-                        .create_response(
-                            &self.ctx.http,
-                            CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("✅ 协议已成功发布到当前帖子！")
-                                    .ephemeral(true),
-                            ),
-                        )
-                        .await?;
-
-                    // 编辑followup消息为最终状态
-                    followup_message
-                        .edit(
-                            &self.ctx.http,
-                            serenity::all::EditMessage::new()
-                                .content("协议已创建、设置为默认协议，并发布到当前帖子！")
-                                .components(Vec::new()),
-                        )
-                        .await?;
-                }
-                "skip_publish_new_license" => {
-                    // 不发布
-                    interaction
-                        .create_response(
-                            &self.ctx.http,
-                            CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("好的，协议已保存。你可以稍后手动发布或在新帖子中自动发布。")
-                                    .ephemeral(true),
-                            ),
-                        )
-                        .await?;
-
-                    // 编辑followup消息为最终状态
-                    followup_message
-                        .edit(
-                            &self.ctx.http,
-                            AutoPublishUI::create_publish_success_edit(),
-                        )
-                        .await?;
-                }
-                _ => {}
-            }
+            self.handle_new_user_publish_confirmation(license).await?;
         }
 
         self.transition_to(FlowState::Done);
+        Ok(())
+    }
+
+    /// 处理现有用户的发布确认
+    async fn handle_existing_user_publish_confirmation(
+        &mut self,
+        license: crate::services::license::UserLicense,
+    ) -> Result<(), BotError> {
+        let Some(interaction) = self.wait_for_interaction(180).await? else {
+            // 超时已在wait_for_interaction中处理
+            return Ok(());
+        };
+
+        match interaction.data.custom_id.as_str() {
+            "confirm_auto_publish" => {
+                // 确认发布
+                self.publish_license_directly(&license).await?;
+                self.cleanup_message_and_respond(
+                    &interaction,
+                    CreateInteractionResponseMessage::new()
+                        .content("✅ 协议已成功发布！")
+                        .ephemeral(true),
+                ).await?;
+            }
+            "cancel_auto_publish" => {
+                // 取消发布
+                self.cleanup_message_and_respond(
+                    &interaction,
+                    AutoPublishUI::create_publish_cancel_response(),
+                ).await?;
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// 处理新用户的发布确认
+    async fn handle_new_user_publish_confirmation(
+        &mut self,
+        license: crate::services::license::UserLicense,
+    ) -> Result<(), BotError> {
+        let editor_interaction = self.editor_interaction.take().ok_or_else(|| BotError::GenericError {
+            message: "没有可用的编辑器交互来显示确认".to_string(),
+            source: None,
+        })?;
+        
+        let mut followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
+
+        // 等待用户交互 - 从followup消息等待
+        let Some(interaction) = self.wait_for_followup_interaction(&followup_message, 120).await? else {
+            // 超时，转到完成状态
+            return Ok(());
+        };
+
+        match interaction.data.custom_id.as_str() {
+            "confirm_publish_new_license" => {
+                self.publish_and_respond_success(&interaction, &license, &mut followup_message).await?;
+            }
+            "skip_publish_new_license" => {
+                self.respond_skip_publish(&interaction, &mut followup_message).await?;
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// 发布协议并响应成功
+    async fn publish_and_respond_success(
+        &self,
+        interaction: &serenity::all::ComponentInteraction,
+        license: &crate::services::license::UserLicense,
+        followup_message: &mut Message,
+    ) -> Result<(), BotError> {
+        // 发布协议
+        self.publish_license_directly(license).await?;
+
+        // 确认发布成功
+        self.respond_with_success(interaction, "✅ 协议已成功发布到当前帖子！").await?;
+
+        // 编辑followup消息为最终状态
+        followup_message
+            .edit(
+                &self.ctx.http,
+                serenity::all::EditMessage::new()
+                    .content("协议已创建、设置为默认协议，并发布到当前帖子！")
+                    .components(Vec::new()),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// 响应跳过发布
+    async fn respond_skip_publish(
+        &self,
+        interaction: &serenity::all::ComponentInteraction,
+        followup_message: &mut Message,
+    ) -> Result<(), BotError> {
+        // 响应不发布
+        self.respond_with_success(interaction, "好的，协议已保存。你可以稍后手动发布或在新帖子中自动发布。").await?;
+
+        // 编辑followup消息为最终状态
+        followup_message
+            .edit(
+                &self.ctx.http,
+                AutoPublishUI::create_publish_success_edit(),
+            )
+            .await?;
+
         Ok(())
     }
 

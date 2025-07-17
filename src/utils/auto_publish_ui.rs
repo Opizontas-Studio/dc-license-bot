@@ -130,8 +130,7 @@ impl AutoPublishUI {
     /// 创建新协议发布确认的followup消息
     pub fn create_new_license_publish_confirmation(license_name: &str) -> CreateInteractionResponseFollowup {
         let confirm_message = format!(
-            "✅ 协议「{}」已创建并设置为默认协议！\n\n是否要在当前帖子中发布此协议？",
-            license_name
+            "✅ 协议「{license_name}」已创建并设置为默认协议！\n\n是否要在当前帖子中发布此协议？"
         );
 
         CreateInteractionResponseFollowup::new()
