@@ -11,13 +11,7 @@ pub struct LicensePublishService;
 impl LicensePublishService {
     /// 发布协议到指定线程
     ///
-    /// 此方法包含完整的协议发布业务逻辑：
-    /// - 检查并标记旧协议为作废
-    /// - 发布新协议消息
-    /// - 置顶新消息
-    /// - 更新数据库记录
-    /// - 发送备份权限变更通知
-    /// - 增加协议使用计数
+    /// 此方法作为协调者，调用各个专门的函数完成协议发布流程
     pub async fn publish(
         http: &Http,
         data: &Data,
@@ -26,7 +20,30 @@ impl LicensePublishService {
         backup_allowed: bool,
         author: User,
     ) -> Result<(), BotError> {
-        // 1. 检查是否已有协议
+        // 1. 处理已有协议
+        Self::handle_existing_license(http, data, thread).await?;
+
+        // 2. 发布新协议消息
+        let new_msg = Self::publish_new_message(http, thread, license, backup_allowed, &author).await?;
+
+        // 3. 更新数据库记录
+        let backup_changed = Self::update_database_records(data, thread, new_msg.id, author.id, backup_allowed).await?;
+
+        // 4. 发送备份通知（如果需要）
+        Self::send_backup_notification_if_needed(http, data, thread, new_msg.id, &author, license, backup_allowed, backup_changed).await?;
+
+        // 5. 增加使用计数
+        Self::increment_usage_count(data, license.id, author.id).await?;
+
+        Ok(())
+    }
+
+    /// 处理已有协议（标记为作废并取消置顶）
+    async fn handle_existing_license(
+        http: &Http,
+        data: &Data,
+        thread: &GuildChannel,
+    ) -> Result<(), BotError> {
         let existing_post = data.db().published_posts().get_by_thread(thread.id).await?;
 
         if let Some(existing) = existing_post {
@@ -62,7 +79,17 @@ impl LicensePublishService {
             }
         }
 
-        // 2. 发布新协议
+        Ok(())
+    }
+
+    /// 发布新协议消息并置顶
+    async fn publish_new_message(
+        http: &Http,
+        thread: &GuildChannel,
+        license: &entities::user_licenses::Model,
+        backup_allowed: bool,
+        author: &User,
+    ) -> Result<serenity::all::Message, BotError> {
         let display_name = thread
             .guild_id
             .member(http, author.id)
@@ -76,23 +103,47 @@ impl LicensePublishService {
             .send_message(http, CreateMessage::new().embed(license_embed))
             .await?;
 
-        // 3. Pin新消息
+        // Pin新消息
         let _ = new_msg.pin(http).await;
 
-        // 4. 检查备份权限是否变更
+        Ok(new_msg)
+    }
+
+    /// 更新数据库记录并检查备份权限变更
+    async fn update_database_records(
+        data: &Data,
+        thread: &GuildChannel,
+        message_id: MessageId,
+        author_id: serenity::all::UserId,
+        backup_allowed: bool,
+    ) -> Result<bool, BotError> {
+        // 检查备份权限是否变更
         let backup_changed = data
             .db()
             .published_posts()
             .has_backup_permission_changed(thread.id, backup_allowed)
             .await?;
 
-        // 5. 更新数据库
+        // 更新数据库
         data.db()
             .published_posts()
-            .record_or_update(thread.id, new_msg.id, author.id, backup_allowed)
+            .record_or_update(thread.id, message_id, author_id, backup_allowed)
             .await?;
 
-        // 6. 如果备份权限发生变更，发送通知
+        Ok(backup_changed)
+    }
+
+    /// 发送备份通知（如果权限发生变更）
+    async fn send_backup_notification_if_needed(
+        http: &Http,
+        data: &Data,
+        thread: &GuildChannel,
+        message_id: MessageId,
+        author: &User,
+        license: &entities::user_licenses::Model,
+        backup_allowed: bool,
+        backup_changed: bool,
+    ) -> Result<(), BotError> {
         if backup_changed {
             info!("备份权限发生变更，发送通知");
 
@@ -103,7 +154,7 @@ impl LicensePublishService {
 
             let notification_payload = NotificationPayload::from_discord_context(
                 thread,
-                new_msg.id,
+                message_id,
                 author.clone(),
                 content_preview,
                 license.license_name.clone(),
@@ -120,13 +171,19 @@ impl LicensePublishService {
             }
         }
 
-        // 7. 增加协议使用计数
+        Ok(())
+    }
+
+    /// 增加协议使用计数
+    async fn increment_usage_count(
+        data: &Data,
+        license_id: i32,
+        author_id: serenity::all::UserId,
+    ) -> Result<(), BotError> {
         data.db()
             .license()
-            .increment_usage(license.id, author.id)
-            .await?;
-
-        Ok(())
+            .increment_usage(license_id, author_id)
+            .await
     }
 
     /// 获取帖子首楼消息内容

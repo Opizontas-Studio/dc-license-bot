@@ -447,14 +447,8 @@ impl<'a> AutoPublishFlow<'a> {
         system_licenses: Vec<crate::types::license::SystemLicense>,
     ) -> Result<(), BotError> {
         // 等待用户选择协议
-        let Some(select_interaction) = interaction
-            .get_response(&self.ctx.http)
-            .await?
-            .await_component_interaction(&self.ctx.shard)
-            .author_id(self.owner_id)
-            .timeout(std::time::Duration::from_secs(120))
-            .await
-        else {
+        let followup_message = interaction.get_response(&self.ctx.http).await?;
+        let Some(select_interaction) = self.wait_for_followup_interaction(&followup_message, 120).await? else {
             // 超时，转到完成状态
             self.transition_to(FlowState::Done);
             return Ok(());
