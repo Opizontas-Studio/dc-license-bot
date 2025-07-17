@@ -25,6 +25,17 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Create index for user_licenses.user_id
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_user_licenses_user_id")
+                    .table(UserLicenses::Table)
+                    .col(UserLicenses::UserId)
+                    .to_owned(),
+            )
+            .await?;
+
         // Create user_settings table
         manager
             .create_table(
@@ -59,6 +70,17 @@ impl MigrationTrait for Migration {
                     .col(big_unsigned(PublishedPosts::UserId))
                     .col(boolean(PublishedPosts::BackupAllowed))
                     .col(timestamp(PublishedPosts::UpdatedAt).default(Expr::current_timestamp()))
+                    .to_owned(),
+            )
+            .await?;
+
+        // Create index for published_posts.user_id
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_published_posts_user_id")
+                    .table(PublishedPosts::Table)
+                    .col(PublishedPosts::UserId)
                     .to_owned(),
             )
             .await
