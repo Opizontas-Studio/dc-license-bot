@@ -20,8 +20,6 @@ pub enum FlowState {
     Initial,
     /// 等待新用户选择启用/禁用功能
     AwaitingGuidance,
-    /// 选择协议类型（新建或基于系统协议）
-    SelectingLicense,
     /// 编辑协议状态，包含当前编辑的协议数据
     EditingLicense(LicenseEditState),
     /// 确认保存协议状态，包含待保存的协议数据
@@ -92,17 +90,6 @@ impl<'a> AutoPublishFlow<'a> {
                         Ok(()) => {} // 继续到下一个状态
                         Err(e) => {
                             tracing::error!("等待引导状态处理错误: {}", e);
-                            self.cleanup().await;
-                            return Err(e);
-                        }
-                    }
-                }
-                FlowState::SelectingLicense => {
-                    // 选择协议类型
-                    match self.handle_selecting_license().await {
-                        Ok(()) => {} // 继续到下一个状态
-                        Err(e) => {
-                            tracing::error!("选择协议状态处理错误: {}", e);
                             self.cleanup().await;
                             return Err(e);
                         }
@@ -383,13 +370,43 @@ impl<'a> AutoPublishFlow<'a> {
                     .set_auto_publish(self.owner_id, true)
                     .await?;
 
-                // 立即确认交互并删除引导消息
+                // 获取协议数据
+                let system_licenses = self.data.system_license_cache().get_all().await;
+                self.system_licenses = Some(system_licenses.clone());
+
+                // 创建选择菜单
+                let mut select_options = vec![
+                    CreateSelectMenuOption::new("创建新协议", "new_license")
+                        .description("创建一个全新的协议"),
+                ];
+
+                for license in &system_licenses {
+                    select_options.push(
+                        CreateSelectMenuOption::new(
+                            &license.license_name,
+                            format!("system_{}", license.license_name),
+                        )
+                        .description("基于系统协议创建"),
+                    );
+                }
+
+                let select_menu = CreateSelectMenu::new(
+                    "license_selection",
+                    CreateSelectMenuKind::String {
+                        options: select_options,
+                    },
+                )
+                .placeholder("请选择协议类型")
+                .max_values(1);
+
+                // 立即确认交互并附加选择菜单 - 全部 ephemeral
                 interaction
                     .create_response(
                         &self.ctx.http,
                         CreateInteractionResponse::Message(
                             CreateInteractionResponseMessage::new()
-                                .content("✅ 自动发布功能已启用！")
+                                .content("✅ 自动发布功能已启用！\n\n请选择你要使用的协议：")
+                                .components(vec![CreateActionRow::SelectMenu(select_menu)])
                                 .ephemeral(true),
                         ),
                     )
@@ -401,7 +418,50 @@ impl<'a> AutoPublishFlow<'a> {
                     self.current_message = None;
                 }
 
-                self.transition_to(FlowState::SelectingLicense);
+                // 等待用户选择协议 - 直接在这里处理
+                let Some(select_interaction) = interaction
+                    .get_response(&self.ctx.http)
+                    .await?
+                    .await_component_interaction(&self.ctx.shard)
+                    .author_id(self.owner_id)
+                    .timeout(std::time::Duration::from_secs(120))
+                    .await
+                else {
+                    // 超时，转到完成状态
+                    self.transition_to(FlowState::Done);
+                    return Ok(());
+                };
+
+                // 处理用户选择
+                if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
+                    if let Some(selected) = values.first() {
+                        let initial_state = if selected == "new_license" {
+                            LicenseEditState::new("新协议".to_string())
+                        } else if let Some(system_name) = selected.strip_prefix("system_") {
+                            if let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) {
+                                LicenseEditState::from_system_license(system_license)
+                            } else {
+                                return Err(BotError::GenericError {
+                                    message: "选择的系统协议不存在".to_string(),
+                                    source: None,
+                                });
+                            }
+                        } else {
+                            return Err(BotError::GenericError {
+                                message: "无效的选择".to_string(),
+                                source: None,
+                            });
+                        };
+
+                        // 保存选择交互并转换状态
+                        self.pending_interaction = Some(select_interaction);
+                        self.transition_to(FlowState::EditingLicense(initial_state));
+                    } else {
+                        self.transition_to(FlowState::Done);
+                    }
+                } else {
+                    self.transition_to(FlowState::Done);
+                }
             }
             "disable_auto_publish_setup" => {
                 // 用户选择关闭功能
@@ -435,102 +495,6 @@ impl<'a> AutoPublishFlow<'a> {
         Ok(())
     }
 
-    /// 处理选择协议状态
-    async fn handle_selecting_license(&mut self) -> Result<(), BotError> {
-        // 获取系统协议并缓存
-        let system_licenses = self.data.system_license_cache().get_all().await;
-        self.system_licenses = Some(system_licenses.clone());
-
-        // 创建选择菜单
-        let mut select_options = vec![
-            CreateSelectMenuOption::new("创建新协议", "new_license")
-                .description("创建一个全新的协议"),
-        ];
-
-        for license in &system_licenses {
-            select_options.push(
-                CreateSelectMenuOption::new(
-                    &license.license_name,
-                    format!("system_{}", license.license_name),
-                )
-                .description("基于系统协议创建"),
-            );
-        }
-
-        let select_menu = CreateSelectMenu::new(
-            "license_selection",
-            CreateSelectMenuKind::String {
-                options: select_options,
-            },
-        )
-        .placeholder("请选择协议类型")
-        .max_values(1);
-
-        // 发送选择菜单
-        if let Some(ref mut message) = self.current_message {
-            // 编辑现有消息
-            message
-                .edit(
-                    &self.ctx.http,
-                    serenity::all::EditMessage::new()
-                        .content("请选择你要使用的协议：")
-                        .components(vec![CreateActionRow::SelectMenu(select_menu)]),
-                )
-                .await?;
-        } else {
-            // 创建新消息
-            let new_message = CreateMessage::new()
-                .content("请选择你要使用的协议：")
-                .components(vec![CreateActionRow::SelectMenu(select_menu)]);
-
-            let sent_message = ChannelId::new(self.thread.id.get())
-                .send_message(&self.ctx.http, new_message)
-                .await?;
-
-            self.current_message = Some(sent_message);
-        }
-
-        // 等待用户选择
-        let Some(select_interaction) = self.wait_for_interaction(120).await? else {
-            // 超时已在wait_for_interaction中处理
-            return Ok(());
-        };
-
-        // 处理用户选择
-        if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind
-        {
-            if let Some(selected) = values.first() {
-                let initial_state = if selected == "new_license" {
-                    LicenseEditState::new("新协议".to_string())
-                } else if let Some(system_name) = selected.strip_prefix("system_") {
-                    if let Some(system_license) = system_licenses
-                        .iter()
-                        .find(|l| l.license_name == system_name)
-                    {
-                        LicenseEditState::from_system_license(system_license)
-                    } else {
-                        return Err(BotError::GenericError {
-                            message: "选择的系统协议不存在".to_string(),
-                            source: None,
-                        });
-                    }
-                } else {
-                    return Err(BotError::GenericError {
-                        message: "无效的选择".to_string(),
-                        source: None,
-                    });
-                };
-
-                self.transition_to(FlowState::EditingLicense(initial_state));
-            } else {
-                self.transition_to(FlowState::Done);
-            }
-        } else {
-            self.transition_to(FlowState::Done);
-        }
-
-        Ok(())
-    }
 
     /// 处理编辑协议状态
     async fn handle_editing_license(

@@ -238,11 +238,11 @@ impl<'a> LicenseEditor<'a> {
                         self.core.get_state_mut().license_name =
                             input.value.clone().unwrap_or_default();
                     }
+                    // 仅在用户提交modal后更新UI
+                    let (embed, components) = self.core.build_ui();
+                    self.edit_response(interaction, embed, components).await?;
                 }
-
-                // 更新UI显示
-                let (embed, components) = self.core.build_ui();
-                self.edit_response(interaction, embed, components).await?;
+                // 如果用户取消modal，则不执行任何操作，避免重复响应
 
                 Ok(false) // 继续编辑
             }
@@ -284,11 +284,11 @@ impl<'a> LicenseEditor<'a> {
                             Some(value)
                         };
                     }
+                    // 仅在用户提交modal后更新UI
+                    let (embed, components) = self.core.build_ui();
+                    self.edit_response(interaction, embed, components).await?;
                 }
-
-                // 更新UI显示
-                let (embed, components) = self.core.build_ui();
-                self.edit_response(interaction, embed, components).await?;
+                // 如果用户取消modal，则不执行任何操作，避免重复响应
 
                 Ok(false) // 继续编辑
             }
