@@ -5,7 +5,7 @@ use tracing::warn;
 use super::super::Context;
 use crate::{
     error::BotError,
-    utils::{LicenseEditState, LicenseEmbedBuilder, present_license_editing_panel},
+    utils::{LicenseEditState, LicenseEmbedBuilder, present_license_editing_panel, UserFriendlyErrorMapper},
 };
 
 #[command(
@@ -84,19 +84,20 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
                         .ephemeral(true),
                 ).await?;
             }
-            Err(BotError::GenericError { message, .. }) => {
-                interaction.create_followup(
-                    ctx.http(),
-                    CreateInteractionResponseFollowup::new()
-                        .content(format!("❌ {message}"))
-                        .ephemeral(true),
-                ).await?;
-            }
             Err(e) => {
+                let user_message = UserFriendlyErrorMapper::map_operation_error("create_license", &e);
+                let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&e);
+                
+                let content = if let Some(suggestion) = suggestion {
+                    format!("❌ {}\n💡 {}", user_message, suggestion)
+                } else {
+                    format!("❌ {}", user_message)
+                };
+                
                 interaction.create_followup(
                     ctx.http(),
                     CreateInteractionResponseFollowup::new()
-                        .content(format!("❌ 创建协议时发生错误: {e}"))
+                        .content(content)
                         .ephemeral(true),
                 ).await?;
             }
