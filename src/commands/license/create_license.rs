@@ -3,7 +3,7 @@ use serenity::all::*;
 use tracing::warn;
 
 use super::super::Context;
-use crate::{error::BotError, utils::LicenseEmbedBuilder};
+use crate::{error::BotError, utils::{LicenseEmbedBuilder, UserFriendlyErrorMapper}};
 
 #[derive(Modal)]
 #[name = "限制条件"]
@@ -42,7 +42,10 @@ pub async fn create_license(
     backup: Option<bool>,
 ) -> Result<(), BotError> {
     let Context::Application(app_ctx) = ctx else {
-        panic!("Context is not an ApplicationContext");
+        return Err(BotError::GenericError {
+            message: "不支持的上下文类型".to_string(),
+            source: None,
+        });
     };
     let modal_resp = if rest == Some(true) {
         let Some(modal_resp) = LicenseModal::execute(app_ctx).await? else {
@@ -106,17 +109,25 @@ pub async fn create_license(
                         )
                         .await?;
                 }
-                Err(BotError::GenericError { message, .. }) => {
+                Err(e) => {
+                    let user_message = UserFriendlyErrorMapper::map_operation_error("create_license", &e);
+                    let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&e);
+                    
+                    let content = if let Some(suggestion) = suggestion {
+                        format!("❌ {}\n💡 {}", user_message, suggestion)
+                    } else {
+                        format!("❌ {}", user_message)
+                    };
+                    
                     itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
                         .await?;
                     reply
                         .edit(
                             ctx,
-                            CreateReply::default().content(&message).components(vec![]),
+                            CreateReply::default().content(content).components(vec![]),
                         )
                         .await?;
                 }
-                Err(e) => return Err(e),
             }
         }
         _ => {
