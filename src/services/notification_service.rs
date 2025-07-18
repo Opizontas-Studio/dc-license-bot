@@ -94,7 +94,7 @@ impl NotificationService {
                 .unwrap_or_else(|_| "无法读取响应体".to_string());
             tracing::error!("发送备份通知失败，状态码: {}, 响应: {}", status, error_text);
             Err(BotError::GenericError {
-                message: format!("通知服务返回错误: {status}"),
+                message: format!("HTTP {}", status.as_u16()),
                 source: None,
             })
         }
