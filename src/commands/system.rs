@@ -7,7 +7,7 @@ use serenity::all::{
 use sysinfo::System;
 
 use super::{Context, check_admin};
-use crate::error::BotError;
+use crate::{error::BotError, utils::UserFriendlyErrorMapper};
 
 #[command(
     slash_command,
@@ -162,8 +162,16 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
             ctx.say("✅ 系统授权已成功从文件刷新。").await?;
         }
         Err(error) => {
-            ctx.say(format!("❌ 重载失败，请检查日志。错误信息: {error}"))
-                .await?;
+            let user_message = UserFriendlyErrorMapper::map_operation_error("reload_licenses", &error);
+            let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&error);
+            
+            let content = if let Some(suggestion) = suggestion {
+                format!("❌ {}\n💡 {}", user_message, suggestion)
+            } else {
+                format!("❌ {}", user_message)
+            };
+            
+            ctx.say(content).await?;
         }
     }
 
