@@ -45,6 +45,60 @@ pub enum BotError {
         #[snafu(source(from(serenity::Error, Box::new)))]
         source: Box<serenity::Error>,
     },
+    #[snafu(display("数据库错误: {}", message))]
+    DatabaseError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("Discord API错误: {}", message))]
+    DiscordError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("网络请求错误: {}", message))]
+    ReqwestError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("配置错误: {}", message))]
+    ConfigError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("序列化错误: {}", message))]
+    SerdeError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("未找到: {}", message))]
+    NotFoundError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("权限不足: {}", message))]
+    AuthorizationError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("操作频率限制: {}", message))]
+    RateLimitError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
+    #[snafu(display("操作超时: {}", message))]
+    TimeoutError {
+        message: String,
+        #[snafu(implicit)]
+        loc: Location,
+    },
     #[snafu(whatever, display("{message}"))]
     GenericError {
         message: String,
