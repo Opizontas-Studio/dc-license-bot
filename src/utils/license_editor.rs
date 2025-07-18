@@ -109,7 +109,6 @@ impl<'a> UIProvider for LicenseEditor<'a> {
             .get_response(&self.serenity_ctx.http)
             .await?
             .await_modal_interaction(&self.serenity_ctx.shard)
-            .timeout(std::time::Duration::from_secs(60)) // 1分钟超时
             .await
         {
             // 确认响应

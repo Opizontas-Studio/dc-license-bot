@@ -19,11 +19,17 @@ use crate::{
 pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError> {
     // 创建一个简单的确认消息来获取ComponentInteraction
     let start_button = CreateButton::new("start_create_license")
-        .label("开始创建协议")
+        .label("开始创建")
         .style(ButtonStyle::Primary);
     
+    let embed = CreateEmbed::new()
+        .title("📝 创建新协议")
+        .description("使用交互式面板创建自定义协议。您可以设置协议名称、权限选项和限制条件。")
+        .color(0x3498db)
+        .footer(CreateEmbedFooter::new("点击下方按钮开始创建"));
+
     let reply = CreateReply::default()
-        .content("点击按钮开始创建新协议")
+        .embed(embed)
         .components(vec![CreateActionRow::Buttons(vec![start_button])]);
     
     let reply_handle = ctx.send(reply).await?;
