@@ -84,6 +84,7 @@ fn option(_cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
         commands: vec![
             auto_publish_settings(),
             create_license(),
+            create_license_interactive(),
             register(),
             system_info(),
             license_manager(),

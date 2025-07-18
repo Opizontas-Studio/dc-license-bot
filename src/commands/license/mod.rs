@@ -2,6 +2,8 @@ mod settings;
 pub use settings::*;
 mod create_license;
 pub use create_license::*;
+mod create_license_interactive;
+pub use create_license_interactive::*;
 mod license_manager;
 pub use license_manager::*;
 mod publish_license;
