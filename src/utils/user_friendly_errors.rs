@@ -171,6 +171,7 @@ impl UserFriendlyErrorMapper {
 mod tests {
     use super::*;
     use crate::error::BotError;
+    use snafu::Location;
 
     #[test]
     fn test_user_friendly_message_detection() {
@@ -189,6 +190,7 @@ mod tests {
     fn test_operation_error_mapping() {
         let db_error = BotError::DatabaseError {
             message: "Connection failed".to_string(),
+            loc: Location::new("test", 0, 0),
         };
         
         let create_error = UserFriendlyErrorMapper::map_operation_error("create_license", &db_error);
@@ -202,6 +204,7 @@ mod tests {
     fn test_user_suggestion() {
         let validation_error = BotError::ValidationError {
             message: "name is required".to_string(),
+            loc: Location::new("test", 0, 0),
         };
         
         let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&validation_error);
