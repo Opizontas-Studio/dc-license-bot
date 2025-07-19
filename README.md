@@ -100,22 +100,26 @@ dc-license-bot/
 
 ### 配置文件示例
 ```toml
-# Discord机器人令牌
-token = "YOUR_DISCORD_BOT_TOKEN"
+# Discord Bot Configuration 
+# 使用前请复制为 "config.toml" 并填入信息。
 
-# 时区偏移
+# [核心配置]
+token = "YOUR_DISCORD_BOT_TOKEN_HERE"
 time_offset = 7200
+# [安全与权限]
 
-# 管理员用户ID列表
+# 拥有特殊权限的用户ID列表。
 extra_admins_ids = [
-    123456789012345678
+    # 80181316945921,123456789876
+]
+admin_role_ids = [
+
 ]
 
-# 管理员角色ID列表  
-admin_role_ids = []
 
-# 备份服务配置
+# 是否启用与备份Bot的同步功能
 backup_enabled = false
+# 备份Bot的接收端点 URL
 endpoint = "http://127.0.0.1:8199"
 ```
 
@@ -128,6 +132,7 @@ endpoint = "http://127.0.0.1:8199"
 | `/license_manager` | `/协议管理` | 管理现有的许可协议 |
 | `/publish_license` | `/发布协议` | 在帖子中发布许可协议 |
 | `/auto_publish_settings` | `/自动发布设置` | 配置自动发布功能 |
+| `/create_license_interactive` | `/创建协议面板` | 使用交互式面板创建新协议 |
 
 ### 管理员命令
 | 命令 | 中文名 | 描述 |
@@ -155,8 +160,10 @@ endpoint = "http://127.0.0.1:8199"
 |------|------|------|
 | `user_id` | BIGINT | 用户Discord ID（主键） |
 | `auto_publish_enabled` | BOOLEAN | 是否启用自动发布 |
-| `default_user_license_id` | INTEGER | 默认用户许可ID |
-| `default_system_license_name` | TEXT | 默认系统许可名称 |
+| `skip_auto_publish_confirmation` | BOOLEAN | 是否跳过自动发布的确认步骤 |
+| `default_user_license_id` | INTEGER | 默认用户许可ID（可选） |
+| `default_system_license_name` | TEXT | 默认系统许可名称（可选） |
+| `default_system_license_backup` | BOOLEAN | 默认系统许可的备份设置（可选） |
 
 ### 已发布帖子表 (`published_posts`)
 | 字段 | 类型 | 描述 |
