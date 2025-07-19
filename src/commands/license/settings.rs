@@ -62,7 +62,7 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
         .label("切换跳过确认")
         .style(ButtonStyle::Secondary);
     let system_backup_btn = CreateButton::new("toggle_system_backup")
-        .label("系统协议备份权限")
+        .label("备份设置")
         .style(ButtonStyle::Secondary);
     let close_btn = CreateButton::new("close")
         .label("关闭")

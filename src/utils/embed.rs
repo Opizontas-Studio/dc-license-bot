@@ -101,38 +101,55 @@ impl LicenseEmbedBuilder {
         is_system_license: bool,
         default_system_license_backup: Option<bool>,
     ) -> CreateEmbed {
+        let status_icon = if auto_copyright { "🟢" } else { "🔴" };
+        let status_text = if auto_copyright { "已启用" } else { "已禁用" };
+        
         let mut embed = CreateEmbed::new()
-            .title("🔧 自动发布设置")
-            .description("以下是自动发布的设置选项：")
+            .title("⚙️ 自动发布设置")
+            .description("管理您的自动协议发布配置")
             .field(
-                "自动发布",
-                if auto_copyright { "启用" } else { "禁用" },
+                "🤖 自动发布状态",
+                format!("{} {}", status_icon, status_text),
                 true,
             )
-            .field("默认协议", license_name, true)
             .field(
-                "跳过确认",
-                if skip_confirmation {
-                    "启用"
+                "📜 默认协议",
+                if license_name == "未设置" {
+                    "❌ 未设置".to_string()
                 } else {
-                    "禁用"
+                    format!("✅ {}", license_name)
+                },
+                true,
+            )
+            .field(
+                "⚡ 跳过确认",
+                if skip_confirmation {
+                    "✅ 已启用"
+                } else {
+                    "❌ 已禁用"
                 },
                 true,
             )
             .colour(if auto_copyright {
-                serenity::all::colours::branding::GREEN
+                Colour::from_rgb(76, 175, 80)  // Material Green
             } else {
-                serenity::all::colours::branding::RED
-            });
+                Colour::from_rgb(158, 158, 158)  // Material Grey
+            })
+            .footer(CreateEmbedFooter::new("💡 点击下方按钮修改设置"))
+            .timestamp(Timestamp::now());
             
         // 如果使用系统协议，显示备份权限设置
         if is_system_license {
-            let backup_status = match default_system_license_backup {
-                None => "使用系统默认",
-                Some(true) => "允许备份",
-                Some(false) => "禁止备份",
+            let (backup_icon, backup_text) = match default_system_license_backup {
+                None => ("🔄", "使用系统默认"),
+                Some(true) => ("✅", "允许备份"),
+                Some(false) => ("❌", "禁止备份"),
             };
-            embed = embed.field("系统协议备份权限", backup_status, true);
+            embed = embed.field(
+                "💾 备份权限", 
+                format!("{} {}", backup_icon, backup_text), 
+                true
+            );
         }
         
         embed
