@@ -98,8 +98,10 @@ impl LicenseEmbedBuilder {
         auto_copyright: bool,
         license_name: String,
         skip_confirmation: bool,
+        is_system_license: bool,
+        default_system_license_backup: Option<bool>,
     ) -> CreateEmbed {
-        CreateEmbed::new()
+        let mut embed = CreateEmbed::new()
             .title("🔧 自动发布设置")
             .description("以下是自动发布的设置选项：")
             .field(
@@ -121,7 +123,19 @@ impl LicenseEmbedBuilder {
                 serenity::all::colours::branding::GREEN
             } else {
                 serenity::all::colours::branding::RED
-            })
+            });
+            
+        // 如果使用系统协议，显示备份权限设置
+        if is_system_license {
+            let backup_status = match default_system_license_backup {
+                None => "使用系统默认",
+                Some(true) => "允许备份",
+                Some(false) => "禁止备份",
+            };
+            embed = embed.field("系统协议备份权限", backup_status, true);
+        }
+        
+        embed
     }
 
     /// 创建协议发布embed（用于实际发布的协议消息）
