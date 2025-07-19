@@ -254,25 +254,29 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 handler.edit(ctx, create_reply(embed, is_system_license)).await?;
             }
             "toggle_system_backup" => {
-                // 获取当前设置
+                // 获取当前设置和默认协议
                 let user_settings = db.user_settings().get_or_create(ctx.author().id).await?;
                 let current_backup = user_settings.default_system_license_backup;
+                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
                 
-                // 切换备份权限设置
-                let new_backup = match current_backup {
-                    None => Some(true),      // 未设置 -> 允许备份
-                    Some(true) => Some(false), // 允许备份 -> 不允许备份
-                    Some(false) => None,      // 不允许备份 -> 使用系统默认
-                };
-                
-                // 更新设置
-                db.user_settings()
-                    .set_default_license(
-                        ctx.author().id,
-                        None,  // 不改变默认协议
-                        new_backup,
-                    )
-                    .await?;
+                // 确保当前使用的是系统协议
+                if let Some(DefaultLicenseIdentifier::System(license_name)) = default_license {
+                    // 切换备份权限设置
+                    let new_backup = match current_backup {
+                        None => Some(true),      // 未设置 -> 允许备份
+                        Some(true) => Some(false), // 允许备份 -> 不允许备份
+                        Some(false) => None,      // 不允许备份 -> 使用系统默认
+                    };
+                    
+                    // 更新设置，保持系统协议不变
+                    db.user_settings()
+                        .set_default_license(
+                            ctx.author().id,
+                            Some(DefaultLicenseIdentifier::System(license_name)),
+                            new_backup,
+                        )
+                        .await?;
+                }
                 
                 first_interaction
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
