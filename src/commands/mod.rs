@@ -1,9 +1,11 @@
 // mod cookie;
+mod forum_management;
 mod license;
 mod system;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
+use forum_management::*;
 use license::*;
 // use cookie::*;
 use owo_colors::OwoColorize;
@@ -48,6 +50,10 @@ impl Data {
         &self.db
     }
 
+    pub fn cfg(&self) -> &Arc<ArcSwap<BotCfg>> {
+        &self.cfg
+    }
+
     pub fn system_license_cache(&self) -> &Arc<SystemLicenseCache> {
         &self.system_license_cache
     }
@@ -90,6 +96,10 @@ fn option(_cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
             license_manager(),
             publish_license(),
             reload_licenses(),
+            add_forum(),
+            remove_forum(),
+            list_forums(),
+            clear_forums(),
         ],
         on_error: |error| {
             Box::pin(async {

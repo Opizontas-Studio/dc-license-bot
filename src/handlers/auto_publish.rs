@@ -39,6 +39,22 @@ pub async fn handle_thread_create(
         write_cache.insert(thread_id, now);
     }
 
+    // 额外检查：确保论坛频道在白名单中（双重检查，防止竞态条件）
+    if let Some(parent_id) = thread.parent_id {
+        let cfg = data.cfg().load();
+        let is_allowed = cfg.allowed_forum_channels.is_empty() 
+            || cfg.allowed_forum_channels.contains(&parent_id);
+        
+        if !is_allowed {
+            tracing::debug!(
+                "Thread {} created in non-allowed forum (parent: {}), skipping auto publish",
+                thread_id,
+                parent_id
+            );
+            return Ok(());
+        }
+    }
+
     // 等待1秒，确保帖子作者有时间发送第一条消息
     // Discord要求帖子作者必须先发送消息，机器人才能在线程中发送消息
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;

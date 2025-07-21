@@ -13,7 +13,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serenity::{
-    all::{RoleId, UserId},
+    all::{ChannelId, RoleId, UserId},
     prelude::TypeMapKey,
 };
 use snafu::ResultExt;
@@ -29,6 +29,8 @@ pub struct BotCfg {
     pub backup_enabled: bool,
     pub endpoint: Url,
     pub extra_admins_ids: HashSet<UserId>,
+    #[serde(default)]
+    pub allowed_forum_channels: HashSet<ChannelId>,
     #[serde(skip)]
     pub path: PathBuf,
 }
@@ -50,8 +52,8 @@ impl BotCfg {
     }
 
     pub fn write(&self) -> Result<(), BotError> {
-        let json = serenity::json::to_string_pretty(self)
-            .whatever_context::<&str, BotError>("Failed to serialize configuration to JSON")?;
-        std::fs::write(&self.path, json).whatever_context("Failed to write configuration file")
+        let toml_content = toml::to_string_pretty(self)
+            .whatever_context::<&str, BotError>("Failed to serialize configuration to TOML")?;
+        std::fs::write(&self.path, toml_content).whatever_context("Failed to write configuration file")
     }
 }
