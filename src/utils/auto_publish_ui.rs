@@ -49,6 +49,46 @@ impl AutoPublishUI {
         .max_values(1)
     }
 
+    /// 构建重新选择协议菜单的followup消息
+    pub fn build_license_reselection_menu(
+        system_licenses: &[crate::types::license::SystemLicense],
+    ) -> CreateInteractionResponseFollowup {
+        let mut select_options = vec![
+            CreateSelectMenuOption::new("创建新协议", "new_license")
+                .description("创建一个全新的协议"),
+        ];
+
+        for license in system_licenses {
+            select_options.push(
+                CreateSelectMenuOption::new(
+                    &license.license_name,
+                    format!("system_{}", license.license_name),
+                )
+                .description("基于系统协议创建"),
+            );
+        }
+
+        // 添加退出选项
+        select_options.push(
+            CreateSelectMenuOption::new("不再设置", "exit_setup")
+                .description("退出协议设置流程")
+        );
+
+        let select_menu = CreateSelectMenu::new(
+            "license_reselection",
+            CreateSelectMenuKind::String {
+                options: select_options,
+            },
+        )
+        .placeholder("请重新选择协议类型或退出")
+        .max_values(1);
+
+        CreateInteractionResponseFollowup::new()
+            .content("你取消了之前的协议编辑。请重新选择一个协议类型，或选择\"不再设置\"退出流程：")
+            .components(vec![CreateActionRow::SelectMenu(select_menu)])
+            .ephemeral(true)
+    }
+
     /// 构建自动发布确认面板
     pub fn build_auto_publish_confirmation(
         license: &UserLicense,

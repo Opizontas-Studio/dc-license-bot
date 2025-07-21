@@ -21,6 +21,8 @@ pub enum FlowState {
     AwaitingGuidance,
     /// 编辑协议状态，包含当前编辑的协议数据
     EditingLicense(LicenseEditState),
+    /// 等待重新选择协议状态，包含系统协议缓存
+    AwaitingLicenseReselection(Vec<crate::types::license::SystemLicense>),
     /// 确认保存协议状态，包含待保存的协议数据
     ConfirmingSave(crate::services::license::UserLicense),
     /// 确认发布协议状态，包含待发布的协议数据
@@ -87,6 +89,10 @@ impl<'a> AutoPublishFlow<'a> {
                 FlowState::EditingLicense(ref edit_state) => {
                     let edit_state = edit_state.clone();
                     self.handle_editing_license(edit_state).await
+                }
+                FlowState::AwaitingLicenseReselection(ref system_licenses) => {
+                    let system_licenses = system_licenses.clone();
+                    self.handle_awaiting_license_reselection(system_licenses).await
                 }
                 FlowState::ConfirmingSave(ref license) => {
                     let license = license.clone();
@@ -584,20 +590,67 @@ impl<'a> AutoPublishFlow<'a> {
                 }
             }
             Ok(None) => {
-                // 用户取消了编辑
-                interaction
-                    .create_followup(
-                        &self.ctx.http,
-                        AutoPublishUI::create_cancel_edit_response(),
-                    )
-                    .await?;
-                self.transition_to(FlowState::Done);
+                // 用户取消了编辑，转到重新选择状态
+                let system_licenses = self.system_licenses.clone().unwrap_or_default();
+                self.editor_interaction = Some(interaction.clone());
+                self.transition_to(FlowState::AwaitingLicenseReselection(system_licenses));
             }
             Err(e) => {
                 tracing::error!("协议编辑流程失败: {}", e);
                 self.transition_to(FlowState::Done);
                 return Err(e);
             }
+        }
+
+        Ok(())
+    }
+
+    /// 处理等待重新选择协议状态
+    async fn handle_awaiting_license_reselection(
+        &mut self,
+        system_licenses: Vec<crate::types::license::SystemLicense>,
+    ) -> Result<(), BotError> {
+        // 使用保存的编辑器交互来发送重新选择菜单
+        let editor_interaction = self.editor_interaction.take().ok_or_else(|| BotError::GenericError {
+            message: "没有可用的编辑器交互来显示重新选择菜单".to_string(),
+            source: None,
+        })?;
+
+        // 显示重新选择菜单
+        let followup_message = editor_interaction
+            .create_followup(
+                &self.ctx.http,
+                AutoPublishUI::build_license_reselection_menu(&system_licenses),
+            )
+            .await?;
+
+        // 等待用户重新选择
+        let Some(reselect_interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
+            self.transition_to(FlowState::Done);
+            return Ok(());
+        };
+
+        // 处理用户重新选择
+        if let ComponentInteractionDataKind::StringSelect { values } = &reselect_interaction.data.kind {
+            if let Some(selected) = values.first() {
+                match selected.as_str() {
+                    "exit_setup" => {
+                        // 用户选择退出
+                        self.respond_with_success(&reselect_interaction, "好的，如果你改变主意，可以随时使用 `/自动发布设置` 手动开启。").await?;
+                        self.transition_to(FlowState::Done);
+                    }
+                    _ => {
+                        // 用户选择了协议，重新进入编辑状态
+                        let initial_state = self.create_license_edit_state(selected, &system_licenses)?;
+                        self.pending_interaction = Some(reselect_interaction);
+                        self.transition_to(FlowState::EditingLicense(initial_state));
+                    }
+                }
+            } else {
+                self.transition_to(FlowState::Done);
+            }
+        } else {
+            self.transition_to(FlowState::Done);
         }
 
         Ok(())
