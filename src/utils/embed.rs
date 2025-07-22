@@ -34,7 +34,7 @@ impl LicenseEmbedBuilder {
                 true,
             )
             .field("管理组备份", Self::format_permission(allow_backup), true)
-            .field("商业化使用", Self::format_permission(false), true)
+            .field("商业化使用", "❌ 社区不允许任何作品用于商业化", true)
             .field("限制条件", restrictions_note.unwrap_or("无特殊限制"), false)
     }
     /// 创建协议管理主菜单embed
