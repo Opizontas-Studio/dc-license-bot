@@ -4,6 +4,8 @@ use std::{
     sync::Arc,
 };
 
+use chrono::{DateTime, Utc};
+
 use arc_swap::ArcSwap;
 use figment::{
     Figment,
@@ -33,6 +35,8 @@ pub struct BotCfg {
     pub allowed_forum_channels: HashSet<ChannelId>,
     #[serde(skip)]
     pub path: PathBuf,
+    #[serde(skip)]
+    pub bot_start_time: DateTime<Utc>,
 }
 
 impl TypeMapKey for BotCfg {
@@ -43,6 +47,7 @@ impl BotCfg {
     pub fn read(path: impl AsRef<Path>) -> Result<Self, BotError> {
         Ok(Self {
             path: path.as_ref().to_owned(),
+            bot_start_time: Utc::now(),
             ..Figment::new()
                 .merge(Toml::file(path))
                 .merge(Env::prefixed("DOG_BOT_"))

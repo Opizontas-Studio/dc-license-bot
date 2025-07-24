@@ -1,8 +1,9 @@
 use serenity::all::{
     ChannelId, ComponentInteractionDataKind, Context, CreateInteractionResponse, 
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GuildChannel,
-    Message, UserId,
+    Message, UserId, GetMessages,
 };
+use chrono::Utc;
 
 use crate::{
     commands::Data,
@@ -274,6 +275,41 @@ impl<'a> AutoPublishFlow<'a> {
 
     /// 处理初始状态 - 检查用户设置并决定后续流程
     async fn handle_initial_state(&mut self) -> Result<(), BotError> {
+        // 检查帖子创建时间，防止处理bot部署前的旧帖子
+        if let Some(thread_metadata) = &self.thread.thread_metadata {
+            if let Some(create_timestamp) = thread_metadata.create_timestamp {
+                let bot_start_time = self.data.cfg().load().bot_start_time;
+                
+                // 如果帖子创建时间早于bot启动时间，静默退出
+                if create_timestamp.timestamp() < bot_start_time.timestamp() {
+                    tracing::debug!(
+                        "跳过旧帖子处理: 帖子创建于 {}, bot启动于 {}", 
+                        create_timestamp, 
+                        bot_start_time
+                    );
+                    self.transition_to(FlowState::Done);
+                    return Ok(());
+                }
+                
+                // 额外检查：检查首楼消息时间，确保是真正的新帖子
+                if let Ok(messages) = self.thread.messages(&self.ctx.http, GetMessages::new().limit(1)).await {
+                    if let Some(first_message) = messages.first() {
+                        let now = Utc::now();
+                        let message_age = now.timestamp() - first_message.timestamp.timestamp();
+                        if message_age > 300 { // 5分钟 = 300秒
+                            tracing::debug!(
+                                "跳过过期帖子处理: 首楼消息发送于 {} ({} 秒前)", 
+                                first_message.timestamp,
+                                message_age
+                            );
+                            self.transition_to(FlowState::Done);
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+
         // 检查用户设置状态
         let user_settings = self.data.db().user_settings().get(self.owner_id).await?;
 
