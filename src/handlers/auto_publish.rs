@@ -10,6 +10,19 @@ use super::auto_publish_flow::AutoPublishFlow;
 // 线程创建事件去重缓存，存储最近处理过的线程ID和处理时间
 static PROCESSED_THREADS: OnceLock<RwLock<HashMap<u64, Instant>>> = OnceLock::new();
 
+/// 检查线程中是否已有首条消息
+/// Discord的ThreadCreate事件会在帖子创建和首条消息发送时都触发
+/// 我们只想处理用户已发送首条消息的情况
+async fn has_first_message(http: &serenity::all::Http, thread: &GuildChannel) -> bool {
+    match thread.messages(http, serenity::all::GetMessages::new().limit(1)).await {
+        Ok(messages) => !messages.is_empty(),
+        Err(e) => {
+            tracing::warn!("检查首条消息时出错: {}", e);
+            false
+        }
+    }
+}
+
 pub async fn handle_thread_create(
     ctx: &Context,
     thread: &GuildChannel,
@@ -55,9 +68,16 @@ pub async fn handle_thread_create(
         }
     }
 
-    // 等待3秒，确保帖子作者有时间发送第一条消息
-    // Discord要求帖子作者必须先发送消息，机器人才能在线程中发送消息
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    // 检查这是否是真正的帖子创建（用户已发首条消息）
+    // Discord傻逼设计：帖子创建和首条消息发送都会触发ThreadCreate事件
+    // 我们只处理用户已发送首条消息的事件
+    if !has_first_message(&ctx.http, thread).await {
+        tracing::debug!(
+            "ThreadCreate事件触发但用户尚未发送首条消息，跳过处理 (thread: {})",
+            thread_id
+        );
+        return Ok(());
+    }
 
     // 1. 获取帖子创建者
     let Some(owner_id) = thread.owner_id else {

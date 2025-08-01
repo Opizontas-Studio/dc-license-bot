@@ -793,16 +793,15 @@ impl<'a> AutoPublishFlow<'a> {
         // 发布协议
         self.publish_license_directly(license).await?;
 
-        // 确认发布成功
-        self.respond_with_success(interaction, "✅ 协议已成功发布到当前帖子！").await?;
-
-        // 编辑followup消息为最终状态
-        followup_message
-            .edit(
+        // 直接编辑确认消息为最终状态，并响应interaction
+        interaction
+            .create_response(
                 &self.ctx.http,
-                serenity::all::EditMessage::new()
-                    .content("协议已创建、设置为默认协议，并发布到当前帖子！")
-                    .components(Vec::new()),
+                CreateInteractionResponse::UpdateMessage(
+                    serenity::all::CreateInteractionResponseMessage::new()
+                        .content("✅ 协议已创建、设置为默认协议，并发布到当前帖子！")
+                        .components(Vec::new()),
+                ),
             )
             .await?;
 
@@ -815,14 +814,15 @@ impl<'a> AutoPublishFlow<'a> {
         interaction: &serenity::all::ComponentInteraction,
         followup_message: &mut Message,
     ) -> Result<(), BotError> {
-        // 响应不发布
-        self.respond_with_success(interaction, "好的，协议已保存。你可以稍后手动发布或在新帖子中自动发布。").await?;
-
-        // 编辑followup消息为最终状态
-        followup_message
-            .edit(
+        // 直接编辑确认消息为最终状态，并响应interaction
+        interaction
+            .create_response(
                 &self.ctx.http,
-                AutoPublishUI::create_publish_success_edit(),
+                CreateInteractionResponse::UpdateMessage(
+                    serenity::all::CreateInteractionResponseMessage::new()
+                        .content("✅ 协议已创建并设置为默认协议！你可以稍后使用 `/发布协议` 或在新帖子中自动发布。")
+                        .components(Vec::new()),
+                ),
             )
             .await?;
 
