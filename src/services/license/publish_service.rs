@@ -134,6 +134,7 @@ impl LicensePublishService {
     }
 
     /// 发送备份通知（如果权限发生变更）
+    #[allow(clippy::too_many_arguments)]
     async fn send_backup_notification_if_needed(
         http: &Http,
         data: &Data,
