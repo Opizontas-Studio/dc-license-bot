@@ -109,7 +109,7 @@ impl LicenseEmbedBuilder {
             .description("管理您的自动协议发布配置")
             .field(
                 "🤖 自动发布状态",
-                format!("{} {}", status_icon, status_text),
+                format!("{status_icon} {status_text}"),
                 true,
             )
             .field(
@@ -117,7 +117,7 @@ impl LicenseEmbedBuilder {
                 if license_name == "未设置" {
                     "❌ 未设置".to_string()
                 } else {
-                    format!("✅ {}", license_name)
+                    format!("✅ {license_name}")
                 },
                 true,
             )
@@ -147,7 +147,7 @@ impl LicenseEmbedBuilder {
             };
             embed = embed.field(
                 "💾 备份权限", 
-                format!("{} {}", backup_icon, backup_text), 
+                format!("{backup_icon} {backup_text}"), 
                 true
             );
         }

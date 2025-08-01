@@ -166,9 +166,9 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
             let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&error);
             
             let content = if let Some(suggestion) = suggestion {
-                format!("❌ {}\n💡 {}", user_message, suggestion)
+                format!("❌ {user_message}\n💡 {suggestion}")
             } else {
-                format!("❌ {}", user_message)
+                format!("❌ {user_message}")
             };
             
             ctx.say(content).await?;

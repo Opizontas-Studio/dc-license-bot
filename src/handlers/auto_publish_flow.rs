@@ -763,7 +763,7 @@ impl<'a> AutoPublishFlow<'a> {
             source: None,
         })?;
         
-        let mut followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
+        let followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
 
         // 等待用户交互 - 从followup消息等待
         let Some(interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
@@ -772,10 +772,10 @@ impl<'a> AutoPublishFlow<'a> {
 
         match interaction.data.custom_id.as_str() {
             "confirm_publish_new_license" => {
-                self.publish_and_respond_success(&interaction, &license, &mut followup_message).await?;
+                self.publish_and_respond_success(&interaction, &license).await?;
             }
             "skip_publish_new_license" => {
-                self.respond_skip_publish(&interaction, &mut followup_message).await?;
+                self.respond_skip_publish(&interaction).await?;
             }
             _ => {}
         }
@@ -788,7 +788,6 @@ impl<'a> AutoPublishFlow<'a> {
         &self,
         interaction: &serenity::all::ComponentInteraction,
         license: &crate::services::license::UserLicense,
-        followup_message: &mut Message,
     ) -> Result<(), BotError> {
         // 发布协议
         self.publish_license_directly(license).await?;
@@ -812,7 +811,6 @@ impl<'a> AutoPublishFlow<'a> {
     async fn respond_skip_publish(
         &self,
         interaction: &serenity::all::ComponentInteraction,
-        followup_message: &mut Message,
     ) -> Result<(), BotError> {
         // 直接编辑确认消息为最终状态，并响应interaction
         interaction

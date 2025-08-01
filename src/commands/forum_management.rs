@@ -145,7 +145,7 @@ pub async fn list_forums(ctx: Context<'_>) -> Result<(), BotError> {
                 }
             }
             _ => {
-                forum_info.push(format!("• ❌ 频道 ID: {} - 无法访问或已删除", channel_id));
+                forum_info.push(format!("• ❌ 频道 ID: {channel_id} - 无法访问或已删除"));
             }
         }
     }
@@ -201,7 +201,7 @@ pub async fn clear_forums(ctx: Context<'_>) -> Result<(), BotError> {
     
     ctx.send(
         CreateReply::default()
-            .content(format!("✅ 已清空论坛白名单（共 {} 个频道），Bot现在将在所有论坛频道中工作。", count))
+            .content(format!("✅ 已清空论坛白名单（共 {count} 个频道），Bot现在将在所有论坛频道中工作。"))
             .ephemeral(true),
     )
     .await?;

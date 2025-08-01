@@ -114,9 +114,9 @@ pub async fn create_license(
                     let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&e);
                     
                     let content = if let Some(suggestion) = suggestion {
-                        format!("❌ {}\n💡 {}", user_message, suggestion)
+                        format!("❌ {user_message}\n💡 {suggestion}")
                     } else {
-                        format!("❌ {}", user_message)
+                        format!("❌ {user_message}")
                     };
                     
                     itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
