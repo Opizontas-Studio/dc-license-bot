@@ -11,3 +11,4 @@ docs/
 BACKUP_DEV.md
 .gitignore
 TUTORIAL.md
+.claude/
