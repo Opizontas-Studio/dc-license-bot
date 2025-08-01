@@ -12,3 +12,5 @@ BACKUP_DEV.md
 .gitignore
 TUTORIAL.md
 .claude/
+deploy-remote.sh
+deploy-fast.sh
