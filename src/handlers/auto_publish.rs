@@ -55,9 +55,9 @@ pub async fn handle_thread_create(
         }
     }
 
-    // 等待1秒，确保帖子作者有时间发送第一条消息
+    // 等待3秒，确保帖子作者有时间发送第一条消息
     // Discord要求帖子作者必须先发送消息，机器人才能在线程中发送消息
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
     // 1. 获取帖子创建者
     let Some(owner_id) = thread.owner_id else {
