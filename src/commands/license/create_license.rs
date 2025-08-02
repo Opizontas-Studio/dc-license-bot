@@ -18,7 +18,7 @@ struct LicenseModal {
     slash_command,
     guild_only,
     user_cooldown = 10,
-    name_localized("zh-CN", "创建协议"),
+    name_localized("zh-CN", "创建协议-参数"),
     description_localized("zh-CN", "创建一个新的协议"),
     ephemeral
 )]

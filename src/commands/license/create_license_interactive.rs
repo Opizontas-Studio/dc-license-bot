@@ -12,8 +12,8 @@ use crate::{
     slash_command,
     guild_only,
     user_cooldown = 10,
-    name_localized("zh-CN", "创建协议面板"),
-    description_localized("zh-CN", "使用交互式面板创建新协议"),
+    name_localized("zh-CN", "创建协议"),
+    description_localized("zh-CN", "创建新协议"),
     ephemeral
 )]
 pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError> {
@@ -24,7 +24,7 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
     
     let embed = CreateEmbed::new()
         .title("📝 创建新协议")
-        .description("使用交互式面板创建自定义协议。您可以设置协议名称、权限选项和限制条件。")
+        .description("使用按钮创建自定义协议。您可以设置协议名称、权限选项和限制条件。")
         .color(0x3498db)
         .footer(CreateEmbedFooter::new("点击下方按钮开始创建"));
 
