@@ -52,31 +52,27 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             default_system_license_backup,
         ))
     };
-    let enable_btn = CreateButton::new("toggle_auto_publish")
-        .label("切换自动发布设置")
-        .style(ButtonStyle::Primary);
-    let default_license_btn = CreateButton::new("set_default_license")
-        .label("设置默认协议")
-        .style(ButtonStyle::Secondary);
-    let skip_confirmation_btn = CreateButton::new("toggle_skip_confirmation")
-        .label("切换跳过确认")
-        .style(ButtonStyle::Secondary);
-    let system_backup_btn = CreateButton::new("toggle_system_backup")
-        .label("备份设置")
-        .style(ButtonStyle::Secondary);
-    let close_btn = CreateButton::new("close")
-        .label("关闭")
-        .style(ButtonStyle::Danger);
+    // 按钮现在在create_reply闭包中动态创建
     let create_reply = |embed: CreateEmbed, show_system_backup: bool| {
         let mut buttons = vec![
-            enable_btn.clone(),
-            default_license_btn.clone(),
-            skip_confirmation_btn.clone(),
+            CreateButton::new("toggle_auto_publish")
+                .label("切换自动发布")
+                .style(ButtonStyle::Primary),
+            CreateButton::new("set_default_license")
+                .label("设置默认协议")
+                .style(ButtonStyle::Secondary),
+            CreateButton::new("toggle_skip_confirmation")
+                .label("切换跳过确认")
+                .style(ButtonStyle::Secondary),
         ];
         if show_system_backup {
-            buttons.push(system_backup_btn.clone());
+            buttons.push(CreateButton::new("toggle_system_backup")
+                .label("备份设置")
+                .style(ButtonStyle::Secondary));
         }
-        buttons.push(close_btn.clone());
+        buttons.push(CreateButton::new("close")
+            .label("关闭")
+            .style(ButtonStyle::Danger));
         
         CreateReply::default()
             .embed(embed)

@@ -125,7 +125,7 @@ pub async fn publish_license(
         .author_member()
         .await
         .map(|m| m.display_name().to_string())
-        .unwrap_or_else(|| ctx.author().name.clone());
+        .unwrap_or_else(|| ctx.author().name.to_string());
     let preview_embed =
         LicenseEmbedBuilder::create_license_embed(&license, backup_allowed, &display_name);
 
