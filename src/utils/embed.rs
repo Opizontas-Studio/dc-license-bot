@@ -1,6 +1,18 @@
 use entities::user_licenses::Model as UserLicense;
 use serenity::all::{Colour, CreateEmbed, CreateEmbedFooter, Timestamp};
 
+// 常用字符串常量
+const PERMISSION_ALLOWED: &str = "✅ 允许";
+const PERMISSION_DENIED: &str = "❌ 不允许";
+const COMMERCIAL_USE_DENIED: &str = "❌ 社区不允许任何作品用于商业化";
+const NO_RESTRICTIONS: &str = "无特殊限制";
+const LICENSE_PROTECTION_TEXT: &str = "本作品内容受以下授权协议保护：";
+const REDISTRIBUTION_FIELD: &str = "社区内二次传播";
+const MODIFICATION_FIELD: &str = "社区内二次修改";
+const BACKUP_FIELD: &str = "管理组备份";
+const COMMERCIAL_FIELD: &str = "商业化使用";
+const RESTRICTIONS_FIELD: &str = "限制条件";
+
 /// 协议相关的嵌入消息构建工具
 pub struct LicenseEmbedBuilder;
 
@@ -8,9 +20,9 @@ impl LicenseEmbedBuilder {
     /// 格式化权限值
     fn format_permission(allowed: bool) -> &'static str {
         if allowed {
-            "✅ 允许"
+            PERMISSION_ALLOWED
         } else {
-            "❌ 不允许"
+            PERMISSION_DENIED
         }
     }
 
@@ -24,18 +36,18 @@ impl LicenseEmbedBuilder {
     ) -> CreateEmbed {
         embed
             .field(
-                "社区内二次传播",
+                REDISTRIBUTION_FIELD,
                 Self::format_permission(allow_redistribution),
                 true,
             )
             .field(
-                "社区内二次修改",
+                MODIFICATION_FIELD,
                 Self::format_permission(allow_modification),
                 true,
             )
-            .field("管理组备份", Self::format_permission(allow_backup), true)
-            .field("商业化使用", "❌ 社区不允许任何作品用于商业化", true)
-            .field("限制条件", restrictions_note.unwrap_or("无特殊限制"), false)
+            .field(BACKUP_FIELD, Self::format_permission(allow_backup), true)
+            .field(COMMERCIAL_FIELD, COMMERCIAL_USE_DENIED, true)
+            .field(RESTRICTIONS_FIELD, restrictions_note.unwrap_or(NO_RESTRICTIONS), false)
     }
     /// 创建协议管理主菜单embed
     pub fn create_license_manager_embed() -> CreateEmbed {
@@ -49,7 +61,7 @@ impl LicenseEmbedBuilder {
     pub fn create_license_detail_embed(license: &UserLicense) -> CreateEmbed {
         let embed = CreateEmbed::new()
             .title(format!("📜 授权协议: {}", license.license_name))
-            .description("本作品内容受以下授权协议保护：")
+            .description(LICENSE_PROTECTION_TEXT)
             .colour(Colour::BLUE);
 
         Self::add_license_fields(
@@ -79,7 +91,7 @@ impl LicenseEmbedBuilder {
     ) -> CreateEmbed {
         let embed = CreateEmbed::new()
             .title(format!("📜 授权协议: {name}"))
-            .description("本作品内容受以下授权协议保护：")
+            .description(LICENSE_PROTECTION_TEXT)
             .colour(Colour::BLUE);
 
         Self::add_license_fields(embed, redis, modify, backup.unwrap_or(false), rest)
@@ -163,7 +175,7 @@ impl LicenseEmbedBuilder {
     ) -> CreateEmbed {
         let embed = CreateEmbed::new()
             .title("📜 授权协议")
-            .description("本作品内容受以下授权协议保护：")
+            .description(LICENSE_PROTECTION_TEXT)
             .colour(Colour::BLUE);
 
         Self::add_license_fields(

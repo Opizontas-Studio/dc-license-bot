@@ -110,32 +110,29 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
         LicenseEmbedBuilder::create_license_detail_embed(license)
     };
 
-    // Create buttons for the second menu
-    let edit_btn = CreateButton::new("edit_license")
-        .label("编辑协议")
-        .style(ButtonStyle::Primary);
-    let delete_btn = CreateButton::new("delete_license")
-        .label("删除协议")
-        .style(ButtonStyle::Danger);
-    let back_btn = CreateButton::new("back")
-        .label("返回")
-        .style(ButtonStyle::Secondary);
-    let exit_btn = CreateButton::new("exit")
-        .label("退出")
-        .style(ButtonStyle::Secondary);
+    // Helper function to create buttons without cloning
+    let create_action_buttons = || vec![
+        CreateButton::new("edit_license")
+            .label("编辑协议")
+            .style(ButtonStyle::Primary),
+        CreateButton::new("delete_license")
+            .label("删除协议")
+            .style(ButtonStyle::Danger),
+        CreateButton::new("back")
+            .label("返回")
+            .style(ButtonStyle::Secondary),
+        CreateButton::new("exit")
+            .label("退出")
+            .style(ButtonStyle::Secondary),
+    ];
 
     // Create the second menu reply
     let second_menu_reply = CreateReply::default()
         .embed(create_second_menu_embed(&license))
-        .components(vec![CreateActionRow::Buttons(vec![
-            edit_btn.clone(),
-            delete_btn.clone(),
-            back_btn.clone(),
-            exit_btn.clone(),
-        ])]);
+        .components(vec![CreateActionRow::Buttons(create_action_buttons())]);
 
     // Edit the original message to show the second menu
-    reply.edit(ctx, second_menu_reply.clone()).await?;
+    reply.edit(ctx, second_menu_reply).await?;
 
     // Create interaction stream for the second menu
     let Some(itx) = reply
@@ -201,12 +198,7 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                                         .embed(LicenseEmbedBuilder::create_license_detail_embed(
                                             &updated_license,
                                         ))
-                                        .components(vec![CreateActionRow::Buttons(vec![
-                                            edit_btn.clone(),
-                                            delete_btn.clone(),
-                                            back_btn.clone(),
-                                            exit_btn.clone(),
-                                        ])]),
+                                        .components(vec![CreateActionRow::Buttons(create_action_buttons())]),
                                 )
                                 .await?;
                         }
@@ -243,12 +235,7 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                             ctx,
                             CreateReply::default()
                                 .embed(create_second_menu_embed(&license))
-                                .components(vec![CreateActionRow::Buttons(vec![
-                                    edit_btn.clone(),
-                                    delete_btn.clone(),
-                                    back_btn.clone(),
-                                    exit_btn.clone(),
-                                ])]),
+                                .components(vec![CreateActionRow::Buttons(create_action_buttons())]),
                         )
                         .await?;
                 }
