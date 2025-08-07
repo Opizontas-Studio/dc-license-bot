@@ -39,7 +39,8 @@ impl FormatTime for TimeFormatter {
 
 #[tokio::main]
 async fn main() -> Result<(), BotError> {
-    let cfg = BotCfg::read(&Args::parse().config)?;
+    let args = Args::parse();
+    let cfg = BotCfg::read(&args.config)?;
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_ansi(true)
@@ -50,12 +51,12 @@ async fn main() -> Result<(), BotError> {
 
     let intents = GatewayIntents::non_privileged() | GatewayIntents::privileged();
 
-    let db = BotDatabase::new(&Args::parse().db).await?;
+    let db = BotDatabase::new(&args.db).await?;
     let cfg = Arc::new(ArcSwap::from_pointee(cfg));
 
     // Initialize system license cache
     let system_license_cache = Arc::new(
-        SystemLicenseCache::new(std::path::Path::new(&Args::parse().default_licenses)).await?,
+        SystemLicenseCache::new(&args.default_licenses).await?,
     );
 
     // Initialize notification service
