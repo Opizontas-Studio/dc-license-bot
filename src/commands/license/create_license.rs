@@ -56,6 +56,23 @@ pub async fn create_license(
     } else {
         None
     };
+
+    // 检查协议名称是否重复
+    let name_exists = ctx
+        .data()
+        .db
+        .license()
+        .license_name_exists(ctx.author().id, &name, None)
+        .await?;
+
+    if name_exists {
+        ctx.send(CreateReply::default()
+            .content("❌ 您已经创建过同名协议，请使用不同的名称。")
+            .ephemeral(true))
+            .await?;
+        return Ok(());
+    }
+
     let preview_license_embed = LicenseEmbedBuilder::create_license_preview_embed(
         &name,
         redis,
@@ -88,7 +105,7 @@ pub async fn create_license(
                 .license()
                 .create(
                     ctx.author().id,
-                    name,
+                    name.clone(),
                     redis,
                     modify,
                     modal_resp.map(|m| m.restrictions),
@@ -104,7 +121,7 @@ pub async fn create_license(
                         .edit(
                             ctx,
                             CreateReply::default()
-                                .content("协议已创建")
+                                .content("✅ 协议已创建")
                                 .components(vec![]),
                         )
                         .await?;

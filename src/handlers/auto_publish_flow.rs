@@ -527,7 +527,7 @@ impl<'a> AutoPublishFlow<'a> {
         // 处理用户选择
         if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
             if let Some(selected) = values.first() {
-                let initial_state = self.create_license_edit_state(selected, &system_licenses)?;
+                let initial_state = self.create_license_edit_state(selected, &system_licenses).await?;
                 
                 // 保存选择交互并转换状态
                 self.pending_interaction = Some(select_interaction);
@@ -543,13 +543,17 @@ impl<'a> AutoPublishFlow<'a> {
     }
 
     /// 根据选择创建编辑状态
-    fn create_license_edit_state(
+    async fn create_license_edit_state(
         &self,
         selected: &str,
         system_licenses: &[crate::types::license::SystemLicense],
     ) -> Result<LicenseEditState, BotError> {
         if selected == "new_license" {
-            Ok(LicenseEditState::new("新协议".to_string()))
+            // 使用智能命名策略，避免重名协议
+            let user_licenses = self.data.db().license().get_user_licenses(self.owner_id).await?;
+            let next_number = user_licenses.len() + 1;
+            let default_name = format!("我的协议{next_number}");
+            Ok(LicenseEditState::new(default_name))
         } else if let Some(system_name) = selected.strip_prefix("system_") {
             if let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) {
                 Ok(LicenseEditState::from_system_license(system_license))
@@ -677,7 +681,7 @@ impl<'a> AutoPublishFlow<'a> {
                     }
                     _ => {
                         // 用户选择了协议，重新进入编辑状态
-                        let initial_state = self.create_license_edit_state(selected, &system_licenses)?;
+                        let initial_state = self.create_license_edit_state(selected, &system_licenses).await?;
                         self.pending_interaction = Some(reselect_interaction);
                         self.transition_to(FlowState::EditingLicense(initial_state));
                     }
