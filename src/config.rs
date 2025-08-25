@@ -33,6 +33,10 @@ pub struct BotCfg {
     pub extra_admins_ids: HashSet<UserId>,
     #[serde(default)]
     pub allowed_forum_channels: HashSet<ChannelId>,
+    // GRPC网关配置
+    pub gateway_enabled: Option<bool>,
+    pub gateway_address: Option<String>,
+    pub gateway_api_key: Option<String>,
     #[serde(skip)]
     pub path: PathBuf,
     #[serde(skip)]

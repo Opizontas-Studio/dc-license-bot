@@ -10,6 +10,7 @@ pub mod handlers;
 pub mod services;
 pub mod types;
 pub mod utils;
+pub mod grpc_handlers;
 
 #[derive(Parser)]
 pub struct Args {

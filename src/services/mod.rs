@@ -5,3 +5,4 @@ pub mod notification_service;
 pub mod published_posts;
 pub mod system_license;
 pub mod user_settings;
+pub mod gateway;

@@ -10,7 +10,7 @@ use dc_bot::{
     database::BotDatabase,
     error::BotError,
     handlers::*,
-    services::{notification_service::NotificationService, system_license::SystemLicenseCache},
+    services::{gateway, notification_service::NotificationService, system_license::SystemLicenseCache},
 };
 use serenity::{Client, all::GatewayIntents};
 use tracing_subscriber::{
@@ -61,6 +61,22 @@ async fn main() -> Result<(), BotError> {
 
     // Initialize notification service
     let notification_service = Arc::new(NotificationService::new(cfg.clone()));
+
+    // Start GRPC gateway client if configured
+    if cfg.load().gateway_enabled.unwrap_or(false)
+        && cfg.load().gateway_address.is_some()
+        && cfg.load().gateway_api_key.is_some() {
+        let db_for_gateway = Arc::new(db.clone());
+        let cfg_for_gateway = cfg.clone();
+        tokio::spawn(async move {
+            if let Err(e) = gateway::start_gateway_client_with_retry(db_for_gateway, cfg_for_gateway).await {
+                tracing::error!("Gateway client failed: {}", e);
+            }
+        });
+        tracing::info!("Started GRPC gateway client");
+    } else {
+        tracing::warn!("GRPC gateway not configured, skipping gateway client");
+    }
 
     let mut client = Client::builder(&cfg.load().token, intents)
         .cache_settings({

@@ -19,3 +19,12 @@ admin_role_ids = [
 backup_enabled = false
 # 备份Bot的接收端点 URL
 endpoint = "http://127.0.0.1:8199"
+
+# Gateway configuration for gRPC network integration
+gateway_enabled = true # 是否启用 gRPC 网关集成
+gateway_api_key = "your-gateway-api-key-here" # API 密钥
+# gRPC 网关地址 - 支持多种格式：
+# 1. 完整 URL: "https://grpc.example.com" 或 "http://localhost:50051"
+# 2. 域名/IP: "grpc.example.com" (自动使用 HTTPS) 或 "localhost:50051" (自动使用 HTTP)
+# 3. Cloudflare Tunnel: "your-tunnel.trycloudflare.com" (自动使用 HTTPS)
+gateway_address = "grpc.example.com:443"

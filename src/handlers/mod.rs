@@ -20,8 +20,7 @@ pub async fn poise_event_handler(
             .unwrap_or_default()
             .to_channel(&ctx.http)
             .await
-        {
-            if guild_channel.kind == ChannelType::Forum {
+            && guild_channel.kind == ChannelType::Forum {
                 // 检查论坛频道是否在白名单中
                 let cfg = data.cfg().load();
                 let is_allowed = cfg.allowed_forum_channels.is_empty() 
@@ -41,7 +40,6 @@ pub async fn poise_event_handler(
                     );
                 }
             }
-        }
     }
     Ok(())
 }

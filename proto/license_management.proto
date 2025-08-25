@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package license_management;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+// 用户许可证实体 - 对应 user_licenses 表
+message UserLicense {
+  int32 id = 1;
+  int64 user_id = 2;
+  string license_name = 3;
+  bool allow_redistribution = 4;
+  bool allow_modification = 5;
+  optional string restrictions_note = 6;
+  bool allow_backup = 7;
+  int32 usage_count = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+// 用户设置实体 - 对应 user_settings 表
+message UserSettings {
+  int64 user_id = 1;
+  bool auto_publish_enabled = 2;
+  bool skip_auto_publish_confirmation = 3;
+  optional int32 default_user_license_id = 4;
+  optional string default_system_license_name = 5;
+  optional bool default_system_license_backup = 6;
+}
+
+// 许可证管理服务
+service LicenseManagementService {
+  // 创建用户许可证
+  rpc CreateUserLicense(CreateUserLicenseRequest) returns (UserLicense);
+  // 获取用户的许可证列表
+  rpc GetUserLicenses(GetUserLicensesRequest) returns (GetUserLicensesResponse);
+  // 更新用户许可证
+  rpc UpdateUserLicense(UpdateUserLicenseRequest) returns (UserLicense);
+  // 删除用户许可证
+  rpc DeleteUserLicense(DeleteUserLicenseRequest) returns (DeleteUserLicenseResponse);
+  // 增加许可证使用次数
+  rpc IncrementUsageCount(IncrementUsageRequest) returns (IncrementUsageResponse);
+  
+  // 用户设置管理
+  rpc GetUserSettings(GetUserSettingsRequest) returns (UserSettings);
+  rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UserSettings);
+  
+  // 系统状态
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+// 创建许可证请求
+message CreateUserLicenseRequest {
+  int64 user_id = 1;
+  string license_name = 2;
+  bool allow_redistribution = 3;
+  bool allow_modification = 4;
+  optional string restrictions_note = 5;
+  bool allow_backup = 6;
+}
+
+// 获取用户许可证请求
+message GetUserLicensesRequest {
+  int64 user_id = 1;
+}
+
+// 获取用户许可证响应
+message GetUserLicensesResponse {
+  repeated UserLicense licenses = 1;
+}
+
+// 更新许可证请求
+message UpdateUserLicenseRequest {
+  int32 id = 1;
+  optional string license_name = 2;
+  optional bool allow_redistribution = 3;
+  optional bool allow_modification = 4;
+  optional string restrictions_note = 5;
+  optional bool allow_backup = 6;
+}
+
+// 删除许可证请求
+message DeleteUserLicenseRequest {
+  int32 id = 1;
+}
+
+// 删除许可证响应
+message DeleteUserLicenseResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// 增加使用次数请求
+message IncrementUsageRequest {
+  int32 id = 1;
+}
+
+// 增加使用次数响应
+message IncrementUsageResponse {
+  int32 new_usage_count = 1;
+}
+
+// 获取用户设置请求
+message GetUserSettingsRequest {
+  int64 user_id = 1;
+}
+
+// 更新用户设置请求
+message UpdateUserSettingsRequest {
+  int64 user_id = 1;
+  optional bool auto_publish_enabled = 2;
+  optional bool skip_auto_publish_confirmation = 3;
+  optional int32 default_user_license_id = 4;
+  optional string default_system_license_name = 5;
+  optional bool default_system_license_backup = 6;
+}
+
+// Ping 请求
+message PingRequest {}
+
+// Ping 响应
+message PingResponse {
+  string status = 1;
+  string version = 2;
+  int64 uptime_seconds = 3;
+}
