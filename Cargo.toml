@@ -7,6 +7,9 @@ name = "dc-bot"
 version = "0.1.0"
 edition = "2024"
 
+[build-dependencies]
+tonic-build = "0.11"
+
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemalloc-ctl = { version = "0.6", features = ["stats", "use_std"] }
 tikv-jemallocator = "0.6"
@@ -23,6 +26,7 @@ const_format = { version = "0.2", features = ["rust_1_83"] }
 figment = { version = "0.10", features = ["env", "toml"] }
 futures = "0.3"
 itertools = "0.14"
+moka = { version = "0.12", features = ["future"] }
 owo-colors = "4"
 poise = "0.6"
 rand = "0.9"

@@ -1,14 +1,14 @@
-use std::{collections::HashMap, sync::OnceLock, time::Instant};
+use std::{sync::OnceLock, time::Duration};
 
+use moka::future::Cache;
 use serenity::all::{Context, GuildChannel};
-use tokio::sync::RwLock;
 
 use crate::{commands::Data, error::BotError};
 
 use super::auto_publish_flow::AutoPublishFlow;
 
-// 线程创建事件去重缓存，存储最近处理过的线程ID和处理时间
-static PROCESSED_THREADS: OnceLock<RwLock<HashMap<u64, Instant>>> = OnceLock::new();
+// 线程创建事件去重缓存，使用moka实现TTL自动清理
+static PROCESSED_THREADS: OnceLock<Cache<u64, ()>> = OnceLock::new();
 
 /// 检查线程中是否已有首条消息
 /// Discord的ThreadCreate事件会在帖子创建和首条消息发送时都触发
@@ -28,29 +28,27 @@ pub async fn handle_thread_create(
     thread: &GuildChannel,
     data: &Data,
 ) -> Result<(), BotError> {
-    // 0. 去重检查 - 防止Discord事件重复触发
+    // 0. 去重检查 - 防止Discord事件重复触发，使用TTL缓存自动清理
     let thread_id = thread.id.get();
-    let now = Instant::now();
+    
+    let cache = PROCESSED_THREADS.get_or_init(|| {
+        Cache::builder()
+            .time_to_live(Duration::from_secs(300))  // 5分钟TTL
+            .max_capacity(10_000)                    // 限制最大条目数
+            .build()
+    });
 
-    {
-        let cache = PROCESSED_THREADS.get_or_init(|| RwLock::new(HashMap::new()));
-        let mut write_cache = cache.write().await;
-
-        // 检查是否已处理过（5分钟内）
-        if let Some(&processed_time) = write_cache.get(&thread_id) {
-            if now.duration_since(processed_time).as_secs() < 300 {
-                tracing::debug!(
-                    "Thread {} already processed, skipping duplicate event",
-                    thread_id
-                );
-                return Ok(());
-            }
-        }
-
-        // 清理过期记录并标记当前线程
-        write_cache.retain(|_, &mut time| now.duration_since(time).as_secs() < 300);
-        write_cache.insert(thread_id, now);
+    // 检查是否已处理过
+    if cache.get(&thread_id).await.is_some() {
+        tracing::debug!(
+            "Thread {} already processed, skipping duplicate event",
+            thread_id
+        );
+        return Ok(());
     }
+
+    // 标记当前线程已处理（TTL会自动清理过期条目）
+    cache.insert(thread_id, ()).await;
 
     // 额外检查：确保论坛频道在白名单中（双重检查，防止竞态条件）
     if let Some(parent_id) = thread.parent_id {
