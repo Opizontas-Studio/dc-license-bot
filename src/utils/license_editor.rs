@@ -37,7 +37,7 @@ pub async fn present_license_editing_panel(
             .await?
             .await_component_interaction(&serenity_ctx.shard)
             .author_id(interaction.user.id)
-            .timeout(std::time::Duration::from_secs(300)) // 5分钟超时
+            .timeout(std::time::Duration::from_secs(1800)) // 30分钟超时
             .await
         else {
             // 超时，清理UI
@@ -91,40 +91,6 @@ impl<'a> LicenseEditor<'a> {
 
 #[async_trait::async_trait]
 impl<'a> UIProvider for LicenseEditor<'a> {
-    /// 展示Modal并返回Modal交互结果
-    async fn present_modal(
-        &self,
-        interaction: &ComponentInteraction,
-        modal: CreateModal,
-    ) -> Result<Option<ModalInteraction>, BotError> {
-        interaction
-            .create_response(
-                &self.serenity_ctx.http,
-                CreateInteractionResponse::Modal(modal),
-            )
-            .await?;
-
-        // 等待 Modal 提交
-        if let Some(modal_interaction) = interaction
-            .get_response(&self.serenity_ctx.http)
-            .await?
-            .await_modal_interaction(&self.serenity_ctx.shard)
-            .await
-        {
-            // 确认响应
-            modal_interaction
-                .create_response(
-                    &self.serenity_ctx.http,
-                    CreateInteractionResponse::Acknowledge,
-                )
-                .await?;
-
-            Ok(Some(modal_interaction))
-        } else {
-            warn!("Modal interaction timeout/cancelled");
-            Ok(None)
-        }
-    }
 
     /// 确认交互
     async fn acknowledge(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
@@ -166,7 +132,7 @@ impl<'a> LicenseEditor<'a> {
                 &self.serenity_ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
-                        .content("⚠️ **重要提示：点击'编辑名称'或'编辑限制条件'将弹出输入窗口。由于Discord限制，直接关闭该窗口将导致此面板失效，需要重新开始。**")
+                        .content("📝 **协议编辑器** - 点击按钮修改设置")
                         .embed(embed)
                         .components(components)
                         .ephemeral(true),
@@ -209,8 +175,12 @@ impl<'a> LicenseEditor<'a> {
     ) -> Result<bool, BotError> {
         match interaction.data.custom_id.as_str() {
             "edit_name" => {
-                // 处理编辑名称
-                let modal = CreateModal::new("edit_name_modal", "编辑协议名称").components(vec![
+                // 处理编辑名称 - 立即响应Modal，不等待结果
+                // 在 custom_id 中编码消息ID以便后续更新
+                let message_id = interaction.message.id;
+                let modal_id = format!("edit_name_modal_{}", message_id);
+                
+                let modal = CreateModal::new(modal_id, "编辑协议名称").components(vec![
                     CreateActionRow::InputText(
                         CreateInputText::new(InputTextStyle::Short, "协议名称", "name_input")
                             .placeholder("输入协议名称")
@@ -221,29 +191,24 @@ impl<'a> LicenseEditor<'a> {
                     ),
                 ]);
 
-                if let Some(modal_interaction) = self.present_modal(interaction, modal).await? {
-                    // 提取输入值
-                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction
-                        .data
-                        .components
-                        .first()
-                        .and_then(|row| row.components.first())
-                    {
-                        self.core.get_state_mut().license_name =
-                            input.value.clone().unwrap_or_default();
-                    }
-                    // 仅在用户提交modal后更新UI
-                    let (embed, components) = self.core.build_ui();
-                    self.edit_response(interaction, embed, components).await?;
-                }
-                // 如果用户取消modal，则不执行任何操作，避免重复响应
+                // 直接发送Modal响应，不等待结果
+                interaction
+                    .create_response(
+                        &self.serenity_ctx.http,
+                        CreateInteractionResponse::Modal(modal),
+                    )
+                    .await?;
 
-                Ok(false) // 继续编辑
+                Ok(false) // 继续编辑，Modal处理将在全局事件处理器中异步进行
             }
             "edit_restrictions" => {
-                // 处理编辑限制条件
+                // 处理编辑限制条件 - 立即响应Modal，不等待结果
+                // 在 custom_id 中编码消息ID以便后续更新
+                let message_id = interaction.message.id;
+                let modal_id = format!("edit_restrictions_modal_{}", message_id);
+                
                 let modal =
-                    CreateModal::new("edit_restrictions_modal", "编辑限制条件").components(vec![
+                    CreateModal::new(modal_id, "编辑限制条件").components(vec![
                         CreateActionRow::InputText(
                             CreateInputText::new(
                                 InputTextStyle::Paragraph,
@@ -263,26 +228,13 @@ impl<'a> LicenseEditor<'a> {
                         ),
                     ]);
 
-                if let Some(modal_interaction) = self.present_modal(interaction, modal).await? {
-                    // 提取输入值
-                    if let Some(ActionRowComponent::InputText(input)) = modal_interaction
-                        .data
-                        .components
-                        .first()
-                        .and_then(|row| row.components.first())
-                    {
-                        let value = input.value.clone().unwrap_or_default();
-                        self.core.get_state_mut().restrictions_note = if value.trim().is_empty() {
-                            None
-                        } else {
-                            Some(value)
-                        };
-                    }
-                    // 仅在用户提交modal后更新UI
-                    let (embed, components) = self.core.build_ui();
-                    self.edit_response(interaction, embed, components).await?;
-                }
-                // 如果用户取消modal，则不执行任何操作，避免重复响应
+                // 直接发送Modal响应，不等待结果
+                interaction
+                    .create_response(
+                        &self.serenity_ctx.http,
+                        CreateInteractionResponse::Modal(modal),
+                    )
+                    .await?;
 
                 Ok(false) // 继续编辑
             }
