@@ -66,13 +66,6 @@ impl LicenseEditState {
 /// UI提供者trait，抽象不同框架的UI操作
 #[async_trait::async_trait]
 pub trait UIProvider {
-    /// 展示Modal并返回Modal交互结果
-    async fn present_modal(
-        &self,
-        interaction: &ComponentInteraction,
-        modal: CreateModal,
-    ) -> Result<Option<ModalInteraction>, BotError>;
-
     /// 确认交互
     async fn acknowledge(&self, interaction: &ComponentInteraction) -> Result<(), BotError>;
 
