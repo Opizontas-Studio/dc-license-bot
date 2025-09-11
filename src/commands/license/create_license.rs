@@ -3,7 +3,7 @@ use serenity::all::*;
 use tracing::warn;
 
 use super::super::Context;
-use crate::{error::BotError, utils::{LicenseEmbedBuilder, UserFriendlyErrorMapper}};
+use crate::{error::BotError, utils::LicenseEmbedBuilder};
 
 #[derive(Modal)]
 #[name = "限制条件"]
@@ -127,8 +127,8 @@ pub async fn create_license(
                         .await?;
                 }
                 Err(e) => {
-                    let user_message = UserFriendlyErrorMapper::map_operation_error("create_license", &e);
-                    let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&e);
+                    let user_message = e.user_message();
+                    let suggestion = e.user_suggestion();
                     
                     let content = if let Some(suggestion) = suggestion {
                         format!("❌ {user_message}\n💡 {suggestion}")

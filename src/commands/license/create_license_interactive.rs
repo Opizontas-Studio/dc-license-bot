@@ -5,7 +5,7 @@ use tracing::warn;
 use super::super::Context;
 use crate::{
     error::BotError,
-    utils::{LicenseEditState, LicenseEmbedBuilder, present_license_editing_panel, UserFriendlyErrorMapper},
+    utils::{LicenseEditState, LicenseEmbedBuilder, present_license_editing_panel},
 };
 
 #[command(
@@ -103,8 +103,8 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
                 ).await?;
             }
             Err(e) => {
-                let user_message = UserFriendlyErrorMapper::map_operation_error("create_license", &e);
-                let suggestion = UserFriendlyErrorMapper::get_user_suggestion(&e);
+                let user_message = e.user_message();
+                let suggestion = e.user_suggestion();
                 
                 let content = if let Some(suggestion) = suggestion {
                     format!("❌ {user_message}\n💡 {suggestion}")
