@@ -47,15 +47,23 @@ pub async fn handle_thread_create(
         return Ok(());
     }
 
-    // 标记当前线程已处理（TTL会自动清理过期条目）
-    cache.insert(thread_id, ()).await;
+    // 检查这是否是真正的帖子创建（用户已发首条消息）
+    // Discord会触发两次ThreadCreate事件
+    // 我们只处理用户已发送首条消息的事件
+    if !has_first_message(&ctx.http, thread).await {
+        tracing::debug!(
+            "ThreadCreate事件触发但用户尚未发送首条消息，跳过处理 (thread: {})",
+            thread_id
+        );
+        return Ok(());
+    }
 
     // 额外检查：确保论坛频道在白名单中（双重检查，防止竞态条件）
     if let Some(parent_id) = thread.parent_id {
         let cfg = data.cfg().load();
-        let is_allowed = cfg.allowed_forum_channels.is_empty() 
+        let is_allowed = cfg.allowed_forum_channels.is_empty()
             || cfg.allowed_forum_channels.contains(&parent_id);
-        
+
         if !is_allowed {
             tracing::debug!(
                 "Thread {} created in non-allowed forum (parent: {}), skipping auto publish",
@@ -66,21 +74,13 @@ pub async fn handle_thread_create(
         }
     }
 
-    // 检查这是否是真正的帖子创建（用户已发首条消息）
-    // Discord傻逼设计：帖子创建和首条消息发送都会触发ThreadCreate事件
-    // 我们只处理用户已发送首条消息的事件
-    if !has_first_message(&ctx.http, thread).await {
-        tracing::debug!(
-            "ThreadCreate事件触发但用户尚未发送首条消息，跳过处理 (thread: {})",
-            thread_id
-        );
-        return Ok(());
-    }
-
     // 1. 获取帖子创建者
     let Some(owner_id) = thread.owner_id else {
         return Ok(());
     };
+
+    // 确认需要处理后，标记当前线程已处理（TTL会自动清理过期条目）
+    cache.insert(thread_id, ()).await;
 
     // 2. 使用新的状态机处理所有逻辑
     let flow = AutoPublishFlow::new(ctx, data, owner_id, thread);
