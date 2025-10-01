@@ -1,8 +1,8 @@
 use chrono::Utc;
 use serenity::all::{
     ChannelId, ComponentInteractionDataKind, Context, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GetMessages, GuildChannel,
-    Message, UserId,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GuildChannel, Message,
+    UserId,
 };
 
 use crate::{
@@ -290,24 +290,16 @@ impl<'a> AutoPublishFlow<'a> {
             }
 
             // 额外检查：检查首楼消息时间，确保是真正的新帖子
-            if let Ok(messages) = self
-                .thread
-                .messages(&self.ctx.http, GetMessages::new().limit(1))
-                .await
-                && let Some(first_message) = messages.first()
-            {
-                let now = Utc::now();
-                let message_age = now.timestamp() - first_message.timestamp.timestamp();
-                if message_age > 300 {
-                    // 5分钟 = 300秒
-                    tracing::debug!(
-                        "跳过过期帖子处理: 首楼消息发送于 {} ({} 秒前)",
-                        first_message.timestamp,
-                        message_age
-                    );
-                    self.transition_to(FlowState::Done);
-                    return Ok(());
-                }
+            let now = Utc::now();
+            let thread_age_secs = now.timestamp() - create_timestamp.timestamp();
+            if thread_age_secs > 300 {
+                tracing::debug!(
+                    "跳过过期帖子处理: 帖子创建于 {} ({} 秒前)",
+                    create_timestamp,
+                    thread_age_secs
+                );
+                self.transition_to(FlowState::Done);
+                return Ok(());
             }
         }
 
@@ -476,13 +468,6 @@ impl<'a> AutoPublishFlow<'a> {
         &mut self,
         interaction: serenity::all::ComponentInteraction,
     ) -> Result<(), BotError> {
-        // 启用自动发布功能
-        self.data
-            .db()
-            .user_settings()
-            .set_auto_publish(self.owner_id, true)
-            .await?;
-
         // 获取协议数据
         let system_licenses = self.data.system_license_cache().get_all().await;
         self.system_licenses = Some(system_licenses.clone());
@@ -919,6 +904,12 @@ impl<'a> AutoPublishFlow<'a> {
                 Some(DefaultLicenseIdentifier::User(license.id)),
                 None,
             )
+            .await?;
+
+        self.data
+            .db()
+            .user_settings()
+            .set_auto_publish(self.owner_id, true)
             .await?;
 
         Ok(license)
