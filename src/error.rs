@@ -132,8 +132,12 @@ impl BotError {
     /// 返回针对特定操作的错误消息
     pub fn operation_message(&self, operation: &str) -> String {
         match (operation, self) {
-            ("reload_licenses", BotError::IoError { .. }) => "协议文件读取失败，请检查文件是否存在".to_string(),
-            ("reload_licenses", BotError::SerdeError { .. }) => "协议文件格式错误，请检查文件格式".to_string(),
+            ("reload_licenses", BotError::IoError { .. }) => {
+                "协议文件读取失败，请检查文件是否存在".to_string()
+            }
+            ("reload_licenses", BotError::SerdeError { .. }) => {
+                "协议文件格式错误，请检查文件格式".to_string()
+            }
             _ => self.user_message(),
         }
     }

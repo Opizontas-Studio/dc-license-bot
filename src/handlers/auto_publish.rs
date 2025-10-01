@@ -14,7 +14,10 @@ static PROCESSED_THREADS: OnceLock<Cache<u64, ()>> = OnceLock::new();
 /// Discord的ThreadCreate事件会在帖子创建和首条消息发送时都触发
 /// 我们只想处理用户已发送首条消息的情况
 async fn has_first_message(http: &serenity::all::Http, thread: &GuildChannel) -> bool {
-    match thread.messages(http, serenity::all::GetMessages::new().limit(1)).await {
+    match thread
+        .messages(http, serenity::all::GetMessages::new().limit(1))
+        .await
+    {
         Ok(messages) => !messages.is_empty(),
         Err(e) => {
             tracing::warn!("检查首条消息时出错: {}", e);
@@ -30,11 +33,11 @@ pub async fn handle_thread_create(
 ) -> Result<(), BotError> {
     // 0. 去重检查 - 防止Discord事件重复触发，使用TTL缓存自动清理
     let thread_id = thread.id.get();
-    
+
     let cache = PROCESSED_THREADS.get_or_init(|| {
         Cache::builder()
-            .time_to_live(Duration::from_secs(300))  // 5分钟TTL
-            .max_capacity(10_000)                    // 限制最大条目数
+            .time_to_live(Duration::from_secs(300)) // 5分钟TTL
+            .max_capacity(10_000) // 限制最大条目数
             .build()
     });
 

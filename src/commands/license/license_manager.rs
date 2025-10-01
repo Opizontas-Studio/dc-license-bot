@@ -38,18 +38,16 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
         CreateSelectMenu::new("select_license", CreateSelectMenuKind::String { options })
             .placeholder("选择要设置的协议")
             .max_values(1);
-    
+
     let cancel_button = CreateButton::new("cancel_license_selection")
         .label("❌ 取消")
         .style(ButtonStyle::Secondary);
-    
+
     // create the reply with the select menu and cancel button
-    let reply = CreateReply::default()
-        .embed(embed)
-        .components(vec![
-            CreateActionRow::SelectMenu(select_menu),
-            CreateActionRow::Buttons(vec![cancel_button]),
-        ]);
+    let reply = CreateReply::default().embed(embed).components(vec![
+        CreateActionRow::SelectMenu(select_menu),
+        CreateActionRow::Buttons(vec![cancel_button]),
+    ]);
     let reply = ctx.send(reply).await?;
     // wait for the user to select a license
     let Some(itx) = reply
@@ -111,20 +109,22 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
     };
 
     // Helper function to create buttons without cloning
-    let create_action_buttons = || vec![
-        CreateButton::new("edit_license")
-            .label("编辑协议")
-            .style(ButtonStyle::Primary),
-        CreateButton::new("delete_license")
-            .label("删除协议")
-            .style(ButtonStyle::Danger),
-        CreateButton::new("back")
-            .label("返回")
-            .style(ButtonStyle::Secondary),
-        CreateButton::new("exit")
-            .label("退出")
-            .style(ButtonStyle::Secondary),
-    ];
+    let create_action_buttons = || {
+        vec![
+            CreateButton::new("edit_license")
+                .label("编辑协议")
+                .style(ButtonStyle::Primary),
+            CreateButton::new("delete_license")
+                .label("删除协议")
+                .style(ButtonStyle::Danger),
+            CreateButton::new("back")
+                .label("返回")
+                .style(ButtonStyle::Secondary),
+            CreateButton::new("exit")
+                .label("退出")
+                .style(ButtonStyle::Secondary),
+        ]
+    };
 
     // Create the second menu reply
     let second_menu_reply = CreateReply::default()
@@ -198,7 +198,9 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                                         .embed(LicenseEmbedBuilder::create_license_detail_embed(
                                             &updated_license,
                                         ))
-                                        .components(vec![CreateActionRow::Buttons(create_action_buttons())]),
+                                        .components(vec![CreateActionRow::Buttons(
+                                            create_action_buttons(),
+                                        )]),
                                 )
                                 .await?;
                         }
@@ -235,7 +237,9 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
                             ctx,
                             CreateReply::default()
                                 .embed(create_second_menu_embed(&license))
-                                .components(vec![CreateActionRow::Buttons(create_action_buttons())]),
+                                .components(vec![
+                                    CreateActionRow::Buttons(create_action_buttons()),
+                                ]),
                         )
                         .await?;
                 }

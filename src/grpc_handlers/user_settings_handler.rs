@@ -1,7 +1,7 @@
-use prost::Message;
-use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, IntoActiveModel};
-use tracing::info;
 use entities::user_settings;
+use prost::Message;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel, Set};
+use tracing::info;
 
 // 包含生成的 protobuf 代码
 pub mod license_management {
@@ -21,7 +21,10 @@ fn to_proto_user_settings(model: user_settings::Model) -> UserSettings {
     }
 }
 
-pub async fn handle_get_user_settings(payload: &[u8], db: &DatabaseConnection) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn handle_get_user_settings(
+    payload: &[u8],
+    db: &DatabaseConnection,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     let request = GetUserSettingsRequest::decode(payload)?;
     info!("Getting settings for user {}", request.user_id);
 
@@ -36,7 +39,10 @@ pub async fn handle_get_user_settings(payload: &[u8], db: &DatabaseConnection) -
     Ok(buf)
 }
 
-pub async fn handle_update_user_settings(payload: &[u8], db: &DatabaseConnection) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn handle_update_user_settings(
+    payload: &[u8],
+    db: &DatabaseConnection,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     let request = UpdateUserSettingsRequest::decode(payload)?;
     info!("Updating settings for user {}", request.user_id);
 
@@ -49,14 +55,25 @@ pub async fn handle_update_user_settings(payload: &[u8], db: &DatabaseConnection
             ..Default::default()
         });
 
-    if let Some(val) = request.auto_publish_enabled { settings.auto_publish_enabled = Set(val); }
-    if let Some(val) = request.skip_auto_publish_confirmation { settings.skip_auto_publish_confirmation = Set(val); }
-    if let Some(val) = request.default_user_license_id { settings.default_user_license_id = Set(Some(val)); }
-    if let Some(val) = request.default_system_license_name { settings.default_system_license_name = Set(Some(val)); }
-    if let Some(val) = request.default_system_license_backup { settings.default_system_license_backup = Set(Some(val)); }
+    if let Some(val) = request.auto_publish_enabled {
+        settings.auto_publish_enabled = Set(val);
+    }
+    if let Some(val) = request.skip_auto_publish_confirmation {
+        settings.skip_auto_publish_confirmation = Set(val);
+    }
+    if let Some(val) = request.default_user_license_id {
+        settings.default_user_license_id = Set(Some(val));
+    }
+    if let Some(val) = request.default_system_license_name {
+        settings.default_system_license_name = Set(Some(val));
+    }
+    if let Some(val) = request.default_system_license_backup {
+        settings.default_system_license_backup = Set(Some(val));
+    }
 
     let result = settings.save(db).await?;
-    let model = result.try_into()
+    let model = result
+        .try_into()
         .map_err(|e| format!("Failed to convert saved settings to model: {:?}", e))?;
     let response = to_proto_user_settings(model);
 

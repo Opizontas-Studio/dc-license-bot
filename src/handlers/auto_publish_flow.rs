@@ -1,9 +1,9 @@
-use serenity::all::{
-    ChannelId, ComponentInteractionDataKind, Context, CreateInteractionResponse, 
-    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GuildChannel,
-    Message, UserId, GetMessages,
-};
 use chrono::Utc;
+use serenity::all::{
+    ChannelId, ComponentInteractionDataKind, Context, CreateInteractionResponse,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GetMessages, GuildChannel,
+    Message, UserId,
+};
 
 use crate::{
     commands::Data,
@@ -81,19 +81,16 @@ impl<'a> AutoPublishFlow<'a> {
             tracing::debug!("处理状态: {:?}", self.state);
 
             let result = match self.state {
-                FlowState::Initial => {
-                    self.handle_initial_state().await
-                }
-                FlowState::AwaitingGuidance => {
-                    self.handle_awaiting_guidance().await
-                }
+                FlowState::Initial => self.handle_initial_state().await,
+                FlowState::AwaitingGuidance => self.handle_awaiting_guidance().await,
                 FlowState::EditingLicense(ref edit_state) => {
                     let edit_state = edit_state.clone();
                     self.handle_editing_license(edit_state).await
                 }
                 FlowState::AwaitingLicenseReselection(ref system_licenses) => {
                     let system_licenses = system_licenses.clone();
-                    self.handle_awaiting_license_reselection(system_licenses).await
+                    self.handle_awaiting_license_reselection(system_licenses)
+                        .await
                 }
                 FlowState::ConfirmingSave(ref license) => {
                     let license = license.clone();
@@ -174,7 +171,10 @@ impl<'a> AutoPublishFlow<'a> {
         followup_message: &Message,
         timeout_secs: u64,
     ) -> Result<Option<serenity::all::ComponentInteraction>, BotError> {
-        match self.wait_for_followup_interaction(followup_message, timeout_secs).await? {
+        match self
+            .wait_for_followup_interaction(followup_message, timeout_secs)
+            .await?
+        {
             Some(interaction) => Ok(Some(interaction)),
             None => {
                 // 超时，记录日志但不在这里转换状态（由调用者处理）
@@ -250,10 +250,7 @@ impl<'a> AutoPublishFlow<'a> {
 
         // 响应交互
         interaction
-            .create_response(
-                &self.ctx.http,
-                CreateInteractionResponse::Message(response),
-            )
+            .create_response(&self.ctx.http, CreateInteractionResponse::Message(response))
             .await?;
         Ok(())
     }
@@ -277,36 +274,42 @@ impl<'a> AutoPublishFlow<'a> {
     async fn handle_initial_state(&mut self) -> Result<(), BotError> {
         // 检查帖子创建时间，防止处理bot部署前的旧帖子
         if let Some(thread_metadata) = &self.thread.thread_metadata
-            && let Some(create_timestamp) = thread_metadata.create_timestamp {
-                let bot_start_time = self.data.cfg().load().bot_start_time;
-                
-                // 如果帖子创建时间早于bot启动时间，静默退出
-                if create_timestamp.timestamp() < bot_start_time.timestamp() {
+            && let Some(create_timestamp) = thread_metadata.create_timestamp
+        {
+            let bot_start_time = self.data.cfg().load().bot_start_time;
+
+            // 如果帖子创建时间早于bot启动时间，静默退出
+            if create_timestamp.timestamp() < bot_start_time.timestamp() {
+                tracing::debug!(
+                    "跳过旧帖子处理: 帖子创建于 {}, bot启动于 {}",
+                    create_timestamp,
+                    bot_start_time
+                );
+                self.transition_to(FlowState::Done);
+                return Ok(());
+            }
+
+            // 额外检查：检查首楼消息时间，确保是真正的新帖子
+            if let Ok(messages) = self
+                .thread
+                .messages(&self.ctx.http, GetMessages::new().limit(1))
+                .await
+                && let Some(first_message) = messages.first()
+            {
+                let now = Utc::now();
+                let message_age = now.timestamp() - first_message.timestamp.timestamp();
+                if message_age > 300 {
+                    // 5分钟 = 300秒
                     tracing::debug!(
-                        "跳过旧帖子处理: 帖子创建于 {}, bot启动于 {}", 
-                        create_timestamp, 
-                        bot_start_time
+                        "跳过过期帖子处理: 首楼消息发送于 {} ({} 秒前)",
+                        first_message.timestamp,
+                        message_age
                     );
                     self.transition_to(FlowState::Done);
                     return Ok(());
                 }
-                
-                // 额外检查：检查首楼消息时间，确保是真正的新帖子
-                if let Ok(messages) = self.thread.messages(&self.ctx.http, GetMessages::new().limit(1)).await
-                    && let Some(first_message) = messages.first() {
-                        let now = Utc::now();
-                        let message_age = now.timestamp() - first_message.timestamp.timestamp();
-                        if message_age > 300 { // 5分钟 = 300秒
-                            tracing::debug!(
-                                "跳过过期帖子处理: 首楼消息发送于 {} ({} 秒前)", 
-                                first_message.timestamp,
-                                message_age
-                            );
-                            self.transition_to(FlowState::Done);
-                            return Ok(());
-                        }
-                    }
             }
+        }
 
         // 检查用户设置状态
         let user_settings = self.data.db().user_settings().get(self.owner_id).await?;
@@ -491,9 +494,9 @@ impl<'a> AutoPublishFlow<'a> {
         interaction
             .create_response(
                 &self.ctx.http,
-                CreateInteractionResponse::Message(
-                    AutoPublishUI::create_enable_response(select_menu)
-                ),
+                CreateInteractionResponse::Message(AutoPublishUI::create_enable_response(
+                    select_menu,
+                )),
             )
             .await?;
 
@@ -504,8 +507,9 @@ impl<'a> AutoPublishFlow<'a> {
         }
 
         // 等待用户选择协议
-        self.handle_license_selection(interaction, system_licenses).await?;
-        
+        self.handle_license_selection(interaction, system_licenses)
+            .await?;
+
         Ok(())
     }
 
@@ -517,16 +521,22 @@ impl<'a> AutoPublishFlow<'a> {
     ) -> Result<(), BotError> {
         // 等待用户选择协议
         let followup_message = interaction.get_response(&self.ctx.http).await?;
-        let Some(select_interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
+        let Some(select_interaction) = self
+            .wait_for_followup_interaction_or_finish(&followup_message, 120)
+            .await?
+        else {
             self.transition_to(FlowState::Done);
             return Ok(());
         };
 
         // 处理用户选择
-        if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind {
+        if let ComponentInteractionDataKind::StringSelect { values } = &select_interaction.data.kind
+        {
             if let Some(selected) = values.first() {
-                let initial_state = self.create_license_edit_state(selected, &system_licenses).await?;
-                
+                let initial_state = self
+                    .create_license_edit_state(selected, &system_licenses)
+                    .await?;
+
                 // 保存选择交互并转换状态
                 self.pending_interaction = Some(select_interaction);
                 self.transition_to(FlowState::EditingLicense(initial_state));
@@ -548,12 +558,20 @@ impl<'a> AutoPublishFlow<'a> {
     ) -> Result<LicenseEditState, BotError> {
         if selected == "new_license" {
             // 使用智能命名策略，避免重名协议
-            let user_licenses = self.data.db().license().get_user_licenses(self.owner_id).await?;
+            let user_licenses = self
+                .data
+                .db()
+                .license()
+                .get_user_licenses(self.owner_id)
+                .await?;
             let next_number = user_licenses.len() + 1;
             let default_name = format!("我的协议{next_number}");
             Ok(LicenseEditState::new(default_name))
         } else if let Some(system_name) = selected.strip_prefix("system_") {
-            if let Some(system_license) = system_licenses.iter().find(|l| l.license_name == system_name) {
+            if let Some(system_license) = system_licenses
+                .iter()
+                .find(|l| l.license_name == system_name)
+            {
                 Ok(LicenseEditState::from_system_license(system_license))
             } else {
                 Err(BotError::GenericError {
@@ -585,16 +603,13 @@ impl<'a> AutoPublishFlow<'a> {
         interaction
             .create_response(
                 &self.ctx.http,
-                CreateInteractionResponse::Message(
-                    AutoPublishUI::create_disable_response()
-                ),
+                CreateInteractionResponse::Message(AutoPublishUI::create_disable_response()),
             )
             .await?;
 
         self.transition_to(FlowState::Done);
         Ok(())
     }
-
 
     /// 处理编辑协议状态
     async fn handle_editing_license(
@@ -622,7 +637,8 @@ impl<'a> AutoPublishFlow<'a> {
                     Err(e) => {
                         tracing::error!("保存协议失败: {}", e);
                         // 发送错误消息
-                        self.followup_with_error(&interaction, "协议保存失败，请稍后重试。").await?;
+                        self.followup_with_error(&interaction, "协议保存失败，请稍后重试。")
+                            .await?;
                         self.transition_to(FlowState::Done);
                     }
                 }
@@ -649,10 +665,13 @@ impl<'a> AutoPublishFlow<'a> {
         system_licenses: Vec<crate::types::license::SystemLicense>,
     ) -> Result<(), BotError> {
         // 使用保存的编辑器交互来发送重新选择菜单
-        let editor_interaction = self.editor_interaction.take().ok_or_else(|| BotError::GenericError {
-            message: "没有可用的编辑器交互来显示重新选择菜单".to_string(),
-            source: None,
-        })?;
+        let editor_interaction =
+            self.editor_interaction
+                .take()
+                .ok_or_else(|| BotError::GenericError {
+                    message: "没有可用的编辑器交互来显示重新选择菜单".to_string(),
+                    source: None,
+                })?;
 
         // 显示重新选择菜单
         let followup_message = editor_interaction
@@ -663,23 +682,34 @@ impl<'a> AutoPublishFlow<'a> {
             .await?;
 
         // 等待用户重新选择
-        let Some(reselect_interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
+        let Some(reselect_interaction) = self
+            .wait_for_followup_interaction_or_finish(&followup_message, 120)
+            .await?
+        else {
             self.transition_to(FlowState::Done);
             return Ok(());
         };
 
         // 处理用户重新选择
-        if let ComponentInteractionDataKind::StringSelect { values } = &reselect_interaction.data.kind {
+        if let ComponentInteractionDataKind::StringSelect { values } =
+            &reselect_interaction.data.kind
+        {
             if let Some(selected) = values.first() {
                 match selected.as_str() {
                     "exit_setup" => {
                         // 用户选择退出
-                        self.respond_with_success(&reselect_interaction, "好的，如果你改变主意，可以随时使用 `/自动发布设置` 手动开启。").await?;
+                        self.respond_with_success(
+                            &reselect_interaction,
+                            "好的，如果你改变主意，可以随时使用 `/自动发布设置` 手动开启。",
+                        )
+                        .await?;
                         self.transition_to(FlowState::Done);
                     }
                     _ => {
                         // 用户选择了协议，重新进入编辑状态
-                        let initial_state = self.create_license_edit_state(selected, &system_licenses).await?;
+                        let initial_state = self
+                            .create_license_edit_state(selected, &system_licenses)
+                            .await?;
                         self.pending_interaction = Some(reselect_interaction);
                         self.transition_to(FlowState::EditingLicense(initial_state));
                     }
@@ -712,7 +742,8 @@ impl<'a> AutoPublishFlow<'a> {
         // 判断是来自初始状态还是新用户流程
         if self.current_message.is_some() {
             // 来自初始状态的确认发布
-            self.handle_existing_user_publish_confirmation(license).await?;
+            self.handle_existing_user_publish_confirmation(license)
+                .await?;
         } else {
             // 来自新用户流程的发布确认
             self.handle_new_user_publish_confirmation(license).await?;
@@ -740,14 +771,16 @@ impl<'a> AutoPublishFlow<'a> {
                     CreateInteractionResponseMessage::new()
                         .content("✅ 协议已成功发布！")
                         .ephemeral(true),
-                ).await?;
+                )
+                .await?;
             }
             "cancel_auto_publish" => {
                 // 取消发布
                 self.cleanup_message_and_respond(
                     &interaction,
                     AutoPublishUI::create_publish_cancel_response(),
-                ).await?;
+                )
+                .await?;
             }
             _ => {}
         }
@@ -760,21 +793,30 @@ impl<'a> AutoPublishFlow<'a> {
         &mut self,
         license: crate::services::license::UserLicense,
     ) -> Result<(), BotError> {
-        let editor_interaction = self.editor_interaction.take().ok_or_else(|| BotError::GenericError {
-            message: "没有可用的编辑器交互来显示确认".to_string(),
-            source: None,
-        })?;
-        
-        let followup_message = self.show_new_user_publish_confirmation(&license, &editor_interaction).await?;
+        let editor_interaction =
+            self.editor_interaction
+                .take()
+                .ok_or_else(|| BotError::GenericError {
+                    message: "没有可用的编辑器交互来显示确认".to_string(),
+                    source: None,
+                })?;
+
+        let followup_message = self
+            .show_new_user_publish_confirmation(&license, &editor_interaction)
+            .await?;
 
         // 等待用户交互 - 从followup消息等待
-        let Some(interaction) = self.wait_for_followup_interaction_or_finish(&followup_message, 120).await? else {
+        let Some(interaction) = self
+            .wait_for_followup_interaction_or_finish(&followup_message, 120)
+            .await?
+        else {
             return Ok(());
         };
 
         match interaction.data.custom_id.as_str() {
             "confirm_publish_new_license" => {
-                self.publish_and_respond_success(&interaction, &license).await?;
+                self.publish_and_respond_success(&interaction, &license)
+                    .await?;
             }
             "skip_publish_new_license" => {
                 self.respond_skip_publish(&interaction).await?;

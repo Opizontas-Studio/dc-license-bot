@@ -9,7 +9,9 @@ use dc_bot::{
     config::BotCfg,
     database::BotDatabase,
     error::BotError,
-    services::{gateway, notification_service::NotificationService, system_license::SystemLicenseCache},
+    services::{
+        gateway, notification_service::NotificationService, system_license::SystemLicenseCache,
+    },
 };
 use serenity::{Client, all::GatewayIntents};
 use tracing_subscriber::{
@@ -54,9 +56,7 @@ async fn main() -> Result<(), BotError> {
     let cfg = Arc::new(ArcSwap::from_pointee(cfg));
 
     // Initialize system license cache
-    let system_license_cache = Arc::new(
-        SystemLicenseCache::new(&args.default_licenses).await?,
-    );
+    let system_license_cache = Arc::new(SystemLicenseCache::new(&args.default_licenses).await?);
 
     // Initialize notification service
     let notification_service = Arc::new(NotificationService::new(cfg.clone()));
@@ -64,11 +64,14 @@ async fn main() -> Result<(), BotError> {
     // Start GRPC gateway client if configured
     if cfg.load().gateway_enabled.unwrap_or(false)
         && cfg.load().gateway_address.is_some()
-        && cfg.load().gateway_api_key.is_some() {
+        && cfg.load().gateway_api_key.is_some()
+    {
         let db_for_gateway = Arc::new(db.clone());
         let cfg_for_gateway = cfg.clone();
         tokio::spawn(async move {
-            if let Err(e) = gateway::start_gateway_client_with_retry(db_for_gateway, cfg_for_gateway).await {
+            if let Err(e) =
+                gateway::start_gateway_client_with_retry(db_for_gateway, cfg_for_gateway).await
+            {
                 tracing::error!("Gateway client failed: {}", e);
             }
         });

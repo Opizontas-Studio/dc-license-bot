@@ -6,11 +6,11 @@ pub mod commands;
 pub mod config;
 pub mod database;
 pub mod error;
+pub mod grpc_handlers;
 pub mod handlers;
 pub mod services;
 pub mod types;
 pub mod utils;
-pub mod grpc_handlers;
 
 #[derive(Parser)]
 pub struct Args {

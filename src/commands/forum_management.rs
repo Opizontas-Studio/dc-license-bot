@@ -20,37 +20,43 @@ pub async fn add_forum(
     forum_channel: GuildChannel,
 ) -> Result<(), BotError> {
     let channel_id = forum_channel.id;
-    
+
     // 获取当前配置
     let mut cfg = (**ctx.data().cfg().load()).clone();
-    
+
     // 检查是否已存在
     if cfg.allowed_forum_channels.contains(&channel_id) {
         ctx.send(
             CreateReply::default()
-                .content(format!("📋 论坛频道 **{}** 已在白名单中。", forum_channel.name))
+                .content(format!(
+                    "📋 论坛频道 **{}** 已在白名单中。",
+                    forum_channel.name
+                ))
                 .ephemeral(true),
         )
         .await?;
         return Ok(());
     }
-    
+
     // 添加到白名单
     cfg.allowed_forum_channels.insert(channel_id);
-    
+
     // 更新配置文件
     cfg.write()?;
-    
+
     // 更新内存中的配置
     ctx.data().cfg().store(cfg.into());
-    
+
     ctx.send(
         CreateReply::default()
-            .content(format!("✅ 成功将论坛频道 **{}** 添加到Bot生效域白名单。", forum_channel.name))
+            .content(format!(
+                "✅ 成功将论坛频道 **{}** 添加到Bot生效域白名单。",
+                forum_channel.name
+            ))
             .ephemeral(true),
     )
     .await?;
-    
+
     Ok(())
 }
 
@@ -70,37 +76,43 @@ pub async fn remove_forum(
     forum_channel: GuildChannel,
 ) -> Result<(), BotError> {
     let channel_id = forum_channel.id;
-    
+
     // 获取当前配置
     let mut cfg = (**ctx.data().cfg().load()).clone();
-    
+
     // 检查是否存在
     if !cfg.allowed_forum_channels.contains(&channel_id) {
         ctx.send(
             CreateReply::default()
-                .content(format!("📋 论坛频道 **{}** 不在白名单中。", forum_channel.name))
+                .content(format!(
+                    "📋 论坛频道 **{}** 不在白名单中。",
+                    forum_channel.name
+                ))
                 .ephemeral(true),
         )
         .await?;
         return Ok(());
     }
-    
+
     // 从白名单中移除
     cfg.allowed_forum_channels.remove(&channel_id);
-    
+
     // 更新配置文件
     cfg.write()?;
-    
+
     // 更新内存中的配置
     ctx.data().cfg().store(cfg.into());
-    
+
     ctx.send(
         CreateReply::default()
-            .content(format!("✅ 成功从Bot生效域白名单中移除论坛频道 **{}**。", forum_channel.name))
+            .content(format!(
+                "✅ 成功从Bot生效域白名单中移除论坛频道 **{}**。",
+                forum_channel.name
+            ))
             .ephemeral(true),
     )
     .await?;
-    
+
     Ok(())
 }
 
@@ -114,7 +126,7 @@ pub async fn remove_forum(
 /// List all allowed forum channels
 pub async fn list_forums(ctx: Context<'_>) -> Result<(), BotError> {
     let cfg = ctx.data().cfg.load();
-    
+
     if cfg.allowed_forum_channels.is_empty() {
         ctx.send(
             CreateReply::default()
@@ -124,23 +136,18 @@ pub async fn list_forums(ctx: Context<'_>) -> Result<(), BotError> {
         .await?;
         return Ok(());
     }
-    
+
     let mut forum_info = Vec::new();
-    
+
     for &channel_id in &cfg.allowed_forum_channels {
         match channel_id.to_channel(&ctx.http()).await {
             Ok(Channel::Guild(guild_channel)) => {
                 if guild_channel.kind == ChannelType::Forum {
-                    forum_info.push(format!(
-                        "• **{}** (ID: {})", 
-                        guild_channel.name, 
-                        channel_id
-                    ));
+                    forum_info.push(format!("• **{}** (ID: {})", guild_channel.name, channel_id));
                 } else {
                     forum_info.push(format!(
-                        "• ⚠️ **{}** (ID: {}) - 不是论坛频道", 
-                        guild_channel.name, 
-                        channel_id
+                        "• ⚠️ **{}** (ID: {}) - 不是论坛频道",
+                        guild_channel.name, channel_id
                     ));
                 }
             }
@@ -149,20 +156,22 @@ pub async fn list_forums(ctx: Context<'_>) -> Result<(), BotError> {
             }
         }
     }
-    
+
     let embed = CreateEmbed::new()
         .title("📋 Bot生效域论坛频道列表")
         .description(format!(
-            "以下是Bot当前生效的论坛频道列表 (共 {} 个)：\n\n{}", 
+            "以下是Bot当前生效的论坛频道列表 (共 {} 个)：\n\n{}",
             cfg.allowed_forum_channels.len(),
             forum_info.join("\n")
         ))
         .color(0x00FF00)
-        .footer(CreateEmbedFooter::new("只有在这些论坛中创建的帖子才会触发自动发布"));
-    
+        .footer(CreateEmbedFooter::new(
+            "只有在这些论坛中创建的帖子才会触发自动发布",
+        ));
+
     ctx.send(CreateReply::default().embed(embed).ephemeral(true))
         .await?;
-    
+
     Ok(())
 }
 
@@ -177,7 +186,7 @@ pub async fn list_forums(ctx: Context<'_>) -> Result<(), BotError> {
 pub async fn clear_forums(ctx: Context<'_>) -> Result<(), BotError> {
     // 获取当前配置
     let mut cfg = (**ctx.data().cfg().load()).clone();
-    
+
     if cfg.allowed_forum_channels.is_empty() {
         ctx.send(
             CreateReply::default()
@@ -187,24 +196,26 @@ pub async fn clear_forums(ctx: Context<'_>) -> Result<(), BotError> {
         .await?;
         return Ok(());
     }
-    
+
     let count = cfg.allowed_forum_channels.len();
-    
+
     // 清空白名单
     cfg.allowed_forum_channels.clear();
-    
+
     // 更新配置文件
     cfg.write()?;
-    
+
     // 更新内存中的配置
     ctx.data().cfg().store(cfg.into());
-    
+
     ctx.send(
         CreateReply::default()
-            .content(format!("✅ 已清空论坛白名单（共 {count} 个频道），Bot现在将在所有论坛频道中工作。"))
+            .content(format!(
+                "✅ 已清空论坛白名单（共 {count} 个频道），Bot现在将在所有论坛频道中工作。"
+            ))
             .ephemeral(true),
     )
     .await?;
-    
+
     Ok(())
 }

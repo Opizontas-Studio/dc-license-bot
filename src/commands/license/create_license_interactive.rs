@@ -21,7 +21,7 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
     let start_button = CreateButton::new("start_create_license")
         .label("开始创建")
         .style(ButtonStyle::Primary);
-    
+
     let embed = CreateEmbed::new()
         .title("📝 创建新协议")
         .description("使用按钮创建自定义协议。您可以设置协议名称、权限选项和限制条件。")
@@ -31,9 +31,9 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
     let reply = CreateReply::default()
         .embed(embed)
         .components(vec![CreateActionRow::Buttons(vec![start_button])]);
-    
+
     let reply_handle = ctx.send(reply).await?;
-    
+
     // 等待用户点击按钮
     let Some(interaction) = reply_handle
         .message()
@@ -46,17 +46,22 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
         warn!("用户没有响应创建协议面板");
         return Ok(());
     };
-    
+
     if interaction.data.custom_id != "start_create_license" {
         return Ok(());
     }
-    
+
     // 创建初始编辑状态，使用递增的编号避免重复
-    let user_licenses = ctx.data().db().license().get_user_licenses(ctx.author().id).await?;
+    let user_licenses = ctx
+        .data()
+        .db()
+        .license()
+        .get_user_licenses(ctx.author().id)
+        .await?;
     let next_number = user_licenses.len() + 1;
     let default_name = format!("我的协议{next_number}");
     let initial_state = LicenseEditState::new(default_name);
-    
+
     // 调用现有的编辑面板
     if let Ok(Some(final_state)) = present_license_editing_panel(
         ctx.serenity_context(),
@@ -67,60 +72,76 @@ pub async fn create_license_interactive(ctx: Context<'_>) -> Result<(), BotError
     .await
     {
         // 用户保存了协议，提取字段并创建
-        let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) = final_state.to_user_license_fields();
-        
+        let (name, allow_redistribution, allow_modification, restrictions_note, allow_backup) =
+            final_state.to_user_license_fields();
+
         // 检查协议名称是否重复
-        let name_exists = ctx.data().db().license()
+        let name_exists = ctx
+            .data()
+            .db()
+            .license()
             .license_name_exists(ctx.author().id, &name, None)
             .await?;
-        
+
         if name_exists {
-            interaction.create_followup(
-                ctx.http(),
-                CreateInteractionResponseFollowup::new()
-                    .content("❌ 您已经创建过同名协议，请使用不同的名称。")
-                    .ephemeral(true),
-            ).await?;
-            return Ok(());
-        }
-        
-        match ctx.data().db().license().create(
-            ctx.author().id,
-            name,
-            allow_redistribution,
-            allow_modification,
-            restrictions_note,
-            allow_backup,
-        ).await {
-            Ok(license) => {
-                let success_embed = LicenseEmbedBuilder::create_license_detail_embed(&license);
-                interaction.create_followup(
+            interaction
+                .create_followup(
                     ctx.http(),
                     CreateInteractionResponseFollowup::new()
-                        .content("✅ 协议创建成功！")
-                        .embed(success_embed)
+                        .content("❌ 您已经创建过同名协议，请使用不同的名称。")
                         .ephemeral(true),
-                ).await?;
+                )
+                .await?;
+            return Ok(());
+        }
+
+        match ctx
+            .data()
+            .db()
+            .license()
+            .create(
+                ctx.author().id,
+                name,
+                allow_redistribution,
+                allow_modification,
+                restrictions_note,
+                allow_backup,
+            )
+            .await
+        {
+            Ok(license) => {
+                let success_embed = LicenseEmbedBuilder::create_license_detail_embed(&license);
+                interaction
+                    .create_followup(
+                        ctx.http(),
+                        CreateInteractionResponseFollowup::new()
+                            .content("✅ 协议创建成功！")
+                            .embed(success_embed)
+                            .ephemeral(true),
+                    )
+                    .await?;
             }
             Err(e) => {
                 let user_message = e.user_message();
                 let suggestion = e.user_suggestion();
-                
+
                 let content = if let Some(suggestion) = suggestion {
                     format!("❌ {user_message}\n💡 {suggestion}")
                 } else {
                     format!("❌ {user_message}")
                 };
-                
-                interaction.create_followup(
-                    ctx.http(),
-                    CreateInteractionResponseFollowup::new()
-                        .content(content)
-                        .ephemeral(true),
-                ).await?;
+
+                interaction
+                    .create_followup(
+                        ctx.http(),
+                        CreateInteractionResponseFollowup::new()
+                            .content(content)
+                            .ephemeral(true),
+                    )
+                    .await?;
             }
         }
     }
-    
+
     Ok(())
 }

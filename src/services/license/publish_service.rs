@@ -24,13 +24,26 @@ impl LicensePublishService {
         Self::handle_existing_license(http, data, thread).await?;
 
         // 2. 发布新协议消息
-        let new_msg = Self::publish_new_message(http, thread, license, backup_allowed, &author).await?;
+        let new_msg =
+            Self::publish_new_message(http, thread, license, backup_allowed, &author).await?;
 
         // 3. 更新数据库记录
-        let backup_changed = Self::update_database_records(data, thread, new_msg.id, author.id, backup_allowed).await?;
+        let backup_changed =
+            Self::update_database_records(data, thread, new_msg.id, author.id, backup_allowed)
+                .await?;
 
         // 4. 发送备份通知（如果需要）
-        Self::send_backup_notification_if_needed(http, data, thread, new_msg.id, &author, license, backup_allowed, backup_changed).await?;
+        Self::send_backup_notification_if_needed(
+            http,
+            data,
+            thread,
+            new_msg.id,
+            &author,
+            license,
+            backup_allowed,
+            backup_changed,
+        )
+        .await?;
 
         // 5. 增加使用计数
         Self::increment_usage_count(data, license.id, author.id).await?;

@@ -27,12 +27,14 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
             .get_default_license(ctx.author().id)
             .await?;
         let (name, is_system_license) = match default_license {
-            Some(DefaultLicenseIdentifier::User(id)) => (db
-                .license()
-                .get_license(id, ctx.author().id)
-                .await?
-                .map(|l| l.license_name)
-                .unwrap_or_else(|| "未设置".to_string()), false),
+            Some(DefaultLicenseIdentifier::User(id)) => (
+                db.license()
+                    .get_license(id, ctx.author().id)
+                    .await?
+                    .map(|l| l.license_name)
+                    .unwrap_or_else(|| "未设置".to_string()),
+                false,
+            ),
             Some(DefaultLicenseIdentifier::System(name)) => {
                 // Verify the system license exists
                 let system_licenses = ctx.data().system_license_cache.get_all().await;
@@ -66,20 +68,27 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                 .style(ButtonStyle::Secondary),
         ];
         if show_system_backup {
-            buttons.push(CreateButton::new("toggle_system_backup")
-                .label("备份设置")
-                .style(ButtonStyle::Secondary));
+            buttons.push(
+                CreateButton::new("toggle_system_backup")
+                    .label("备份设置")
+                    .style(ButtonStyle::Secondary),
+            );
         }
-        buttons.push(CreateButton::new("close")
-            .label("关闭")
-            .style(ButtonStyle::Danger));
-        
+        buttons.push(
+            CreateButton::new("close")
+                .label("关闭")
+                .style(ButtonStyle::Danger),
+        );
+
         CreateReply::default()
             .embed(embed)
             .components(vec![CreateActionRow::Buttons(buttons)])
     };
     let embed = create_embed().await?;
-    let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
+    let default_license = db
+        .user_settings()
+        .get_default_license(ctx.author().id)
+        .await?;
     let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
 
     let reply = create_reply(embed, is_system_license);
@@ -101,9 +110,15 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
                 let embed = create_embed().await?;
-                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
-                handler.edit(ctx, create_reply(embed, is_system_license)).await?;
+                let default_license = db
+                    .user_settings()
+                    .get_default_license(ctx.author().id)
+                    .await?;
+                let is_system_license =
+                    matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
+                handler
+                    .edit(ctx, create_reply(embed, is_system_license))
+                    .await?;
             }
             "set_default_license" => {
                 // 获取用户协议和系统协议
@@ -211,9 +226,17 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                                     .await?;
                                 // 返回到主菜单
                                 let embed = create_embed().await?;
-                                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
-                handler.edit(ctx, create_reply(embed, is_system_license)).await?;
+                                let default_license = db
+                                    .user_settings()
+                                    .get_default_license(ctx.author().id)
+                                    .await?;
+                                let is_system_license = matches!(
+                                    default_license,
+                                    Some(DefaultLicenseIdentifier::System(_))
+                                );
+                                handler
+                                    .edit(ctx, create_reply(embed, is_system_license))
+                                    .await?;
                             }
                             Err(e) => {
                                 tracing::error!("设置默认协议失败: {}", e);
@@ -221,9 +244,17 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                                     .await?;
                                 let embed = create_embed().await?;
-                                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
-                handler.edit(ctx, create_reply(embed, is_system_license)).await?;
+                                let default_license = db
+                                    .user_settings()
+                                    .get_default_license(ctx.author().id)
+                                    .await?;
+                                let is_system_license = matches!(
+                                    default_license,
+                                    Some(DefaultLicenseIdentifier::System(_))
+                                );
+                                handler
+                                    .edit(ctx, create_reply(embed, is_system_license))
+                                    .await?;
                             }
                         }
                     }
@@ -232,9 +263,15 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                         .create_response(ctx, CreateInteractionResponse::Acknowledge)
                         .await?;
                     let embed = create_embed().await?;
-                    let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
-                handler.edit(ctx, create_reply(embed, is_system_license)).await?;
+                    let default_license = db
+                        .user_settings()
+                        .get_default_license(ctx.author().id)
+                        .await?;
+                    let is_system_license =
+                        matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
+                    handler
+                        .edit(ctx, create_reply(embed, is_system_license))
+                        .await?;
                 }
             }
             "toggle_skip_confirmation" => {
@@ -245,25 +282,34 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
                 let embed = create_embed().await?;
-                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
-                handler.edit(ctx, create_reply(embed, is_system_license)).await?;
+                let default_license = db
+                    .user_settings()
+                    .get_default_license(ctx.author().id)
+                    .await?;
+                let is_system_license =
+                    matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
+                handler
+                    .edit(ctx, create_reply(embed, is_system_license))
+                    .await?;
             }
             "toggle_system_backup" => {
                 // 获取当前设置和默认协议
                 let user_settings = db.user_settings().get_or_create(ctx.author().id).await?;
                 let current_backup = user_settings.default_system_license_backup;
-                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                
+                let default_license = db
+                    .user_settings()
+                    .get_default_license(ctx.author().id)
+                    .await?;
+
                 // 确保当前使用的是系统协议
                 if let Some(DefaultLicenseIdentifier::System(license_name)) = default_license {
                     // 切换备份权限设置
                     let new_backup = match current_backup {
-                        None => Some(true),      // 未设置 -> 允许备份
+                        None => Some(true),        // 未设置 -> 允许备份
                         Some(true) => Some(false), // 允许备份 -> 不允许备份
-                        Some(false) => None,      // 不允许备份 -> 使用系统默认
+                        Some(false) => None,       // 不允许备份 -> 使用系统默认
                     };
-                    
+
                     // 更新设置，保持系统协议不变
                     db.user_settings()
                         .set_default_license(
@@ -273,14 +319,20 @@ pub async fn auto_publish_settings(ctx: Context<'_>) -> Result<(), BotError> {
                         )
                         .await?;
                 }
-                
+
                 first_interaction
                     .create_response(ctx, CreateInteractionResponse::Acknowledge)
                     .await?;
                 let embed = create_embed().await?;
-                let default_license = db.user_settings().get_default_license(ctx.author().id).await?;
-                let is_system_license = matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
-                handler.edit(ctx, create_reply(embed, is_system_license)).await?;
+                let default_license = db
+                    .user_settings()
+                    .get_default_license(ctx.author().id)
+                    .await?;
+                let is_system_license =
+                    matches!(default_license, Some(DefaultLicenseIdentifier::System(_)));
+                handler
+                    .edit(ctx, create_reply(embed, is_system_license))
+                    .await?;
             }
             "close" => {
                 first_interaction

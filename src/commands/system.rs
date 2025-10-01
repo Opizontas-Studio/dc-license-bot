@@ -164,13 +164,13 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
         Err(error) => {
             let user_message = error.operation_message("reload_licenses");
             let suggestion = error.user_suggestion();
-            
+
             let content = if let Some(suggestion) = suggestion {
                 format!("❌ {user_message}\n💡 {suggestion}")
             } else {
                 format!("❌ {user_message}")
             };
-            
+
             ctx.say(content).await?;
         }
     }

@@ -33,7 +33,7 @@ pub async fn present_license_editing_panel(
     loop {
         // 获取response对象用于监听交互
         let response = interaction.get_response(&serenity_ctx.http).await?;
-        
+
         // 根据当前Modal状态决定监听策略
         match editor_state.modal_waiting {
             ModalWaitingState::None => {
@@ -51,7 +51,7 @@ pub async fn present_license_editing_panel(
 
                 // 处理按钮交互
                 let should_exit = editor_state.handle_interaction(&edit_interaction).await?;
-                
+
                 if should_exit {
                     // 检查是否是保存操作
                     if edit_interaction.data.custom_id == "save_license" {
@@ -79,7 +79,7 @@ pub async fn present_license_editing_panel(
                             // 处理Modal提交
                             editor_state.handle_modal_submit(&modal_interaction).await?;
                             editor_state.modal_waiting = ModalWaitingState::None;
-                            
+
                             // 更新UI显示 - 使用原始interaction编辑响应
                             editor_state.update_ui(interaction).await?;
                         } else {
@@ -87,22 +87,22 @@ pub async fn present_license_editing_panel(
                             editor_state.modal_waiting = ModalWaitingState::None;
                         }
                     }
-                    
+
                     // 等待新的按钮交互
                     button_result = response.await_component_interaction(&serenity_ctx.shard)
                         .author_id(interaction.user.id)
                         .timeout(std::time::Duration::from_secs(1800)) => {
-                        
+
                         if let Some(edit_interaction) = button_result {
                             // 新的按钮交互到达，放弃Modal等待
                             if !matches!(editor_state.modal_waiting, ModalWaitingState::None) {
                                 tracing::info!("New button interaction received, abandoning modal wait");
                                 editor_state.modal_waiting = ModalWaitingState::None;
                             }
-                            
+
                             // 处理按钮交互
                             let should_exit = editor_state.handle_interaction(&edit_interaction).await?;
-                            
+
                             if should_exit {
                                 if edit_interaction.data.custom_id == "save_license" {
                                     editor_state.cleanup_ui(&edit_interaction).await?;
@@ -186,7 +186,10 @@ impl<'a> LicenseEditor<'a> {
                 {
                     let new_name = input.value.clone().unwrap_or_default();
                     self.core.get_state_mut().license_name = new_name;
-                    tracing::info!("License name updated to: {}", self.core.get_state().license_name);
+                    tracing::info!(
+                        "License name updated to: {}",
+                        self.core.get_state().license_name
+                    );
                 }
             }
             ModalWaitingState::WaitingForRestrictions => {
@@ -203,7 +206,10 @@ impl<'a> LicenseEditor<'a> {
                     } else {
                         Some(value)
                     };
-                    tracing::info!("License restrictions updated to: {:?}", self.core.get_state().restrictions_note);
+                    tracing::info!(
+                        "License restrictions updated to: {:?}",
+                        self.core.get_state().restrictions_note
+                    );
                 }
             }
             ModalWaitingState::None => {
@@ -213,12 +219,10 @@ impl<'a> LicenseEditor<'a> {
 
         Ok(())
     }
-
 }
 
 #[async_trait::async_trait]
 impl<'a> UIProvider for LicenseEditor<'a> {
-
     /// 确认交互
     async fn acknowledge(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
         interaction
@@ -288,9 +292,7 @@ impl<'a> LicenseEditor<'a> {
 
     /// 清理UI - 删除编辑器消息
     pub async fn cleanup_ui(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
-        interaction
-            .delete_response(&self.serenity_ctx.http)
-            .await?;
+        interaction.delete_response(&self.serenity_ctx.http).await?;
 
         Ok(())
     }
@@ -324,7 +326,9 @@ impl<'a> LicenseEditor<'a> {
 
                 // 设置Modal等待状态
                 self.modal_waiting = ModalWaitingState::WaitingForName;
-                tracing::info!("Modal sent for name editing, waiting for submission or new interaction");
+                tracing::info!(
+                    "Modal sent for name editing, waiting for submission or new interaction"
+                );
 
                 Ok(false) // 继续编辑，但现在处于Modal等待状态
             }
@@ -361,7 +365,9 @@ impl<'a> LicenseEditor<'a> {
 
                 // 设置Modal等待状态
                 self.modal_waiting = ModalWaitingState::WaitingForRestrictions;
-                tracing::info!("Modal sent for restrictions editing, waiting for submission or new interaction");
+                tracing::info!(
+                    "Modal sent for restrictions editing, waiting for submission or new interaction"
+                );
 
                 Ok(false) // 继续编辑，但现在处于Modal等待状态
             }

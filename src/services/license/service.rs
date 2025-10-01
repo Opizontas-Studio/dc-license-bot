@@ -91,7 +91,10 @@ impl LicenseService<'_> {
         // 执行原子更新
         let update_result = Entity::update_many()
             .col_expr(Column::LicenseName, Expr::value(license_name))
-            .col_expr(Column::AllowRedistribution, Expr::value(allow_redistribution))
+            .col_expr(
+                Column::AllowRedistribution,
+                Expr::value(allow_redistribution),
+            )
             .col_expr(Column::AllowModification, Expr::value(allow_modification))
             .col_expr(Column::RestrictionsNote, Expr::value(restrictions_note))
             .col_expr(Column::AllowBackup, Expr::value(allow_backup))
@@ -136,10 +139,7 @@ impl LicenseService<'_> {
     /// Increment usage count for a license (atomic operation)
     pub async fn increment_usage(&self, license_id: i32, user_id: UserId) -> Result<(), BotError> {
         Entity::update_many()
-            .col_expr(
-                Column::UsageCount,
-                Expr::col(Column::UsageCount).add(1),
-            )
+            .col_expr(Column::UsageCount, Expr::col(Column::UsageCount).add(1))
             .filter(
                 Column::Id
                     .eq(license_id)

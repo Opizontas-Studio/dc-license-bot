@@ -63,6 +63,7 @@ impl BotCfg {
     pub fn write(&self) -> Result<(), BotError> {
         let toml_content = toml::to_string_pretty(self)
             .whatever_context::<&str, BotError>("Failed to serialize configuration to TOML")?;
-        std::fs::write(&self.path, toml_content).whatever_context("Failed to write configuration file")
+        std::fs::write(&self.path, toml_content)
+            .whatever_context("Failed to write configuration file")
     }
 }

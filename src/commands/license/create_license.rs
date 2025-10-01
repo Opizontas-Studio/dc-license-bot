@@ -66,10 +66,12 @@ pub async fn create_license(
         .await?;
 
     if name_exists {
-        ctx.send(CreateReply::default()
-            .content("❌ 您已经创建过同名协议，请使用不同的名称。")
-            .ephemeral(true))
-            .await?;
+        ctx.send(
+            CreateReply::default()
+                .content("❌ 您已经创建过同名协议，请使用不同的名称。")
+                .ephemeral(true),
+        )
+        .await?;
         return Ok(());
     }
 
@@ -129,13 +131,13 @@ pub async fn create_license(
                 Err(e) => {
                     let user_message = e.user_message();
                     let suggestion = e.user_suggestion();
-                    
+
                     let content = if let Some(suggestion) = suggestion {
                         format!("❌ {user_message}\n💡 {suggestion}")
                     } else {
                         format!("❌ {user_message}")
                     };
-                    
+
                     itx.create_response(ctx, CreateInteractionResponse::Acknowledge)
                         .await?;
                     reply

@@ -1,7 +1,7 @@
+use crate::config::BotCfg;
+use chrono::Utc;
 use prost::Message;
 use tracing::info;
-use chrono::Utc;
-use crate::config::BotCfg;
 
 // 包含生成的 protobuf 代码
 pub mod license_management {
@@ -9,7 +9,10 @@ pub mod license_management {
 }
 use license_management::*;
 
-pub async fn handle_ping(payload: &[u8], cfg: &BotCfg) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn handle_ping(
+    payload: &[u8],
+    cfg: &BotCfg,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     let _request = PingRequest::decode(payload)?;
     info!("Ping request received");
 

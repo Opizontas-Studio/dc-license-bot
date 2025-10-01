@@ -1,6 +1,6 @@
-use serenity::all::*;
 use crate::services::license::UserLicense;
 use crate::utils::LicenseEmbedBuilder;
+use serenity::all::*;
 
 /// 自动发布流程的UI构建器
 pub struct AutoPublishUI;
@@ -70,8 +70,7 @@ impl AutoPublishUI {
 
         // 添加退出选项
         select_options.push(
-            CreateSelectMenuOption::new("不再设置", "exit_setup")
-                .description("退出协议设置流程")
+            CreateSelectMenuOption::new("不再设置", "exit_setup").description("退出协议设置流程"),
         );
 
         let select_menu = CreateSelectMenu::new(
@@ -116,7 +115,9 @@ impl AutoPublishUI {
     }
 
     /// 创建启用功能的回复消息
-    pub fn create_enable_response(select_menu: CreateSelectMenu) -> CreateInteractionResponseMessage {
+    pub fn create_enable_response(
+        select_menu: CreateSelectMenu,
+    ) -> CreateInteractionResponseMessage {
         CreateInteractionResponseMessage::new()
             .content("✅ 自动发布功能已启用！\n\n请选择你要使用的协议：")
             .components(vec![CreateActionRow::SelectMenu(select_menu)])
@@ -168,7 +169,9 @@ impl AutoPublishUI {
     }
 
     /// 创建新协议发布确认的followup消息
-    pub fn create_new_license_publish_confirmation(license_name: &str) -> CreateInteractionResponseFollowup {
+    pub fn create_new_license_publish_confirmation(
+        license_name: &str,
+    ) -> CreateInteractionResponseFollowup {
         let confirm_message = format!(
             "✅ 协议「{license_name}」已创建并设置为默认协议！\n\n是否要在当前帖子中发布此协议？"
         );

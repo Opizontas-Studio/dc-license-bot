@@ -47,7 +47,11 @@ impl LicenseEmbedBuilder {
             )
             .field(BACKUP_FIELD, Self::format_permission(allow_backup), true)
             .field(COMMERCIAL_FIELD, COMMERCIAL_USE_DENIED, true)
-            .field(RESTRICTIONS_FIELD, restrictions_note.unwrap_or(NO_RESTRICTIONS), false)
+            .field(
+                RESTRICTIONS_FIELD,
+                restrictions_note.unwrap_or(NO_RESTRICTIONS),
+                false,
+            )
     }
     /// 创建协议管理主菜单embed
     pub fn create_license_manager_embed() -> CreateEmbed {
@@ -114,8 +118,12 @@ impl LicenseEmbedBuilder {
         default_system_license_backup: Option<bool>,
     ) -> CreateEmbed {
         let status_icon = if auto_copyright { "🟢" } else { "🔴" };
-        let status_text = if auto_copyright { "已启用" } else { "已禁用" };
-        
+        let status_text = if auto_copyright {
+            "已启用"
+        } else {
+            "已禁用"
+        };
+
         let mut embed = CreateEmbed::new()
             .title("⚙️ 自动发布设置")
             .description("管理您的自动协议发布配置")
@@ -143,13 +151,13 @@ impl LicenseEmbedBuilder {
                 true,
             )
             .colour(if auto_copyright {
-                Colour::from_rgb(76, 175, 80)  // Material Green
+                Colour::from_rgb(76, 175, 80) // Material Green
             } else {
-                Colour::from_rgb(158, 158, 158)  // Material Grey
+                Colour::from_rgb(158, 158, 158) // Material Grey
             })
             .footer(CreateEmbedFooter::new("💡 点击下方按钮修改设置"))
             .timestamp(Timestamp::now());
-            
+
         // 如果使用系统协议，显示备份权限设置
         if is_system_license {
             let (backup_icon, backup_text) = match default_system_license_backup {
@@ -157,13 +165,9 @@ impl LicenseEmbedBuilder {
                 Some(true) => ("✅", "允许备份"),
                 Some(false) => ("❌", "禁止备份"),
             };
-            embed = embed.field(
-                "💾 备份权限", 
-                format!("{backup_icon} {backup_text}"), 
-                true
-            );
+            embed = embed.field("💾 备份权限", format!("{backup_icon} {backup_text}"), true);
         }
-        
+
         embed
     }
 
