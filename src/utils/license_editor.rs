@@ -1,8 +1,10 @@
 use serenity::all::*;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use super::editor_core::{EditorCore, LicenseEditState, UIProvider};
 use crate::{commands::Data, error::BotError};
+
+const INTERACTION_TIMEOUT_SECS: u64 = 600;
 
 /// 协议编辑面板
 ///
@@ -41,7 +43,7 @@ pub async fn present_license_editing_panel(
                 let Some(edit_interaction) = response
                     .await_component_interaction(&serenity_ctx.shard)
                     .author_id(interaction.user.id)
-                    .timeout(std::time::Duration::from_secs(1800)) // 30分钟超时
+                    .timeout(std::time::Duration::from_secs(INTERACTION_TIMEOUT_SECS))
                     .await
                 else {
                     // 超时，清理UI
@@ -91,7 +93,7 @@ pub async fn present_license_editing_panel(
                     // 等待新的按钮交互
                     button_result = response.await_component_interaction(&serenity_ctx.shard)
                         .author_id(interaction.user.id)
-                        .timeout(std::time::Duration::from_secs(1800)) => {
+                        .timeout(std::time::Duration::from_secs(INTERACTION_TIMEOUT_SECS)) => {
 
                         if let Some(edit_interaction) = button_result {
                             // 新的按钮交互到达，放弃Modal等待
@@ -292,9 +294,25 @@ impl<'a> LicenseEditor<'a> {
 
     /// 清理UI - 删除编辑器消息
     pub async fn cleanup_ui(&self, interaction: &ComponentInteraction) -> Result<(), BotError> {
-        interaction.delete_response(&self.serenity_ctx.http).await?;
+        match interaction.delete_response(&self.serenity_ctx.http).await {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                if let serenity::Error::Http(http_err) = &err {
+                    if let serenity::http::HttpError::UnsuccessfulRequest(resp) = http_err {
+                        let code = resp.error.code;
+                        if code == 10062 || code == 10008 {
+                            debug!(
+                                error_code = code,
+                                "Interaction response already gone while cleaning up editor"
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
 
-        Ok(())
+                Err(err.into())
+            }
+        }
     }
 
     /// 处理用户交互
