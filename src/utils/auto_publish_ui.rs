@@ -127,7 +127,11 @@ impl AutoPublishUI {
     /// 创建关闭功能的回复消息
     pub fn create_disable_response() -> CreateInteractionResponseMessage {
         CreateInteractionResponseMessage::new()
-            .content("好的，如果你改变主意，可以随时使用 `/自动发布设置` 手动开启。")
+            .content(concat!(
+                "❕ 自动发布功能暂未启用。\n\n",
+                "📚 命令说明可以在这里了解：https://discord.com/channels/1291925535324110879/1338165171432194118/1403490128105705473\n",
+                "如果你改变主意，可以随时使用 `/自动发布设置` 重新开启。",
+            ))
             .ephemeral(true)
     }
 
