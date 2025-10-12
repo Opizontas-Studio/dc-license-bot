@@ -6,16 +6,20 @@ use serenity::all::*;
 use super::types::UserLicense;
 use crate::{database::BotDatabase, error::BotError};
 
-pub struct LicenseService<'a>(&'a BotDatabase);
+pub struct LicenseService<'a>(&'a DatabaseConnection);
 
 impl BotDatabase {
     /// Get a reference to the license service
     pub fn license(&self) -> LicenseService<'_> {
-        LicenseService(self)
+        LicenseService(self.inner())
     }
 }
 
-impl LicenseService<'_> {
+impl<'a> LicenseService<'a> {
+    pub fn new(conn: &'a DatabaseConnection) -> LicenseService<'a> {
+        LicenseService(conn)
+    }
+
     /// Create a new user license
     pub async fn create(
         &self,
@@ -47,7 +51,7 @@ impl LicenseService<'_> {
             ..Default::default()
         };
 
-        let result = license.insert(self.0.inner()).await?;
+        let result = license.insert(self.0).await?;
         Ok(result)
     }
 
@@ -56,7 +60,7 @@ impl LicenseService<'_> {
         Ok(Entity::find()
             .filter(Column::UserId.eq(user_id.get() as i64))
             .order_by_desc(Column::CreatedAt)
-            .all(self.0.inner())
+            .all(self.0)
             .await?)
     }
 
@@ -72,7 +76,7 @@ impl LicenseService<'_> {
                     .eq(license_id)
                     .and(Column::UserId.eq(user_id.get() as i64)),
             )
-            .one(self.0.inner())
+            .one(self.0)
             .await?)
     }
 
@@ -103,7 +107,7 @@ impl LicenseService<'_> {
                     .eq(license_id)
                     .and(Column::UserId.eq(user_id.get() as i64)),
             )
-            .exec(self.0.inner())
+            .exec(self.0)
             .await?;
 
         // 如果更新成功，获取更新后的记录
@@ -122,7 +126,7 @@ impl LicenseService<'_> {
                     .eq(license_id)
                     .and(Column::UserId.eq(user_id.get() as i64)),
             )
-            .exec(self.0.inner())
+            .exec(self.0)
             .await?;
 
         Ok(result.rows_affected > 0)
@@ -132,7 +136,7 @@ impl LicenseService<'_> {
     pub async fn get_user_license_count(&self, user_id: UserId) -> Result<u64, BotError> {
         Ok(Entity::find()
             .filter(Column::UserId.eq(user_id.get() as i64))
-            .count(self.0.inner())
+            .count(self.0)
             .await?)
     }
 
@@ -145,7 +149,7 @@ impl LicenseService<'_> {
                     .eq(license_id)
                     .and(Column::UserId.eq(user_id.get() as i64)),
             )
-            .exec(self.0.inner())
+            .exec(self.0)
             .await?;
 
         Ok(())
@@ -160,7 +164,7 @@ impl LicenseService<'_> {
             .filter(Column::UserId.eq(user_id.get() as i64))
             .order_by_desc(Column::UsageCount)
             .order_by_desc(Column::CreatedAt)
-            .all(self.0.inner())
+            .all(self.0)
             .await?)
     }
 
@@ -173,7 +177,7 @@ impl LicenseService<'_> {
             .select_only()
             .column_as(Expr::col(Column::UsageCount).sum(), "total_usage")
             .into_tuple::<Option<i32>>()
-            .one(self.0.inner())
+            .one(self.0)
             .await?;
 
         Ok(result.flatten().unwrap_or(0))
@@ -196,14 +200,14 @@ impl LicenseService<'_> {
             query = query.filter(Column::Id.ne(exclude_id));
         }
 
-        Ok(query.one(self.0.inner()).await?.is_some())
+        Ok(query.one(self.0).await?.is_some())
     }
 
     /// Clear all licenses for a user (dangerous operation)
     pub async fn clear_user_licenses(&self, user_id: UserId) -> Result<u64, BotError> {
         let result = Entity::delete_many()
             .filter(Column::UserId.eq(user_id.get() as i64))
-            .exec(self.0.inner())
+            .exec(self.0)
             .await?;
 
         Ok(result.rows_affected)
