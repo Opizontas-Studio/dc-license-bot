@@ -6,6 +6,7 @@ use crate::error::BotError;
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     check = "check_admin",
     ephemeral,
     name_localized("zh-CN", "添加论坛"),
@@ -62,6 +63,7 @@ pub async fn add_forum(
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     check = "check_admin",
     ephemeral,
     name_localized("zh-CN", "移除论坛"),
@@ -118,6 +120,7 @@ pub async fn remove_forum(
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     check = "check_admin",
     ephemeral,
     name_localized("zh-CN", "论坛列表"),
@@ -177,6 +180,7 @@ pub async fn list_forums(ctx: Context<'_>) -> Result<(), BotError> {
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     check = "check_admin",
     ephemeral,
     name_localized("zh-CN", "清空论坛白名单"),

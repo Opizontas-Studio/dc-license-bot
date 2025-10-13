@@ -34,9 +34,6 @@ pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<()
     let total_memory = sys.total_memory() / 1024 / 1024; // Convert to MB
     let used_memory = sys.used_memory() / 1024 / 1024; // Convert to MB
     let memory_usage = (used_memory as f64 / total_memory as f64) * 100.0;
-    let cached_users = ctx.cache().user_count();
-    let cached_guilds = ctx.cache().guild_count();
-    let cached_channels = ctx.cache().guild_channel_count();
     let rust_version = compile_time::rustc_version_str!();
     let db_size = ctx.data().db.size().await? / 1024 / 1024; // Convert to MB
     let latency = ctx.ping().await;
@@ -44,6 +41,11 @@ pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<()
     let queue_count = metrics.global_queue_depth();
     let active_count = metrics.num_alive_tasks();
     let workers = metrics.num_workers();
+
+    // Get application statistics
+    let auto_publish_users = ctx.data().db.user_settings().get_auto_publish_count().await.unwrap_or(0);
+    let total_posts = ctx.data().db.published_posts().get_total_count().await.unwrap_or(0);
+    let backup_allowed_posts = ctx.data().db.published_posts().get_backup_allowed_count().await.unwrap_or(0);
 
     // Get color based on CPU usage
     let color = if cpu_usage < 50.0 {
@@ -82,9 +84,9 @@ pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<()
         .field("🚀 Tokio 活跃任务", active_count.to_string(), true)
         .field("🛠️ Tokio 工作线程", workers.to_string(), true)
         // row 4
-        .field("👥 缓存用户数", cached_users.to_string(), true)
-        .field("🌐 缓存服务器数", cached_guilds.to_string(), true)
-        .field("📺 缓存频道数", cached_channels.to_string(), true)
+        .field("🚀 自动发布用户", auto_publish_users.to_string(), true)
+        .field("📄 使用协议作品", total_posts.to_string(), true)
+        .field("💾 授权备份作品", backup_allowed_posts.to_string(), true)
         .thumbnail(ctx.cache().current_user().avatar_url().unwrap_or_default())
         .timestamp(chrono::Utc::now())
         .footer(CreateEmbedFooter::new("系统监控"))
