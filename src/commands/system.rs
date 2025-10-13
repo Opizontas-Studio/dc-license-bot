@@ -9,18 +9,15 @@ use sysinfo::System;
 use super::{Context, check_admin};
 use crate::error::BotError;
 
-#[command(
-    slash_command,
-    owners_only,
-    global_cooldown = 10,
-    name_localized("zh-CN", "系统信息"),
-    description_localized("zh-CN", "获取系统信息，包括系统名称、内核版本和操作系统版本"),
-    ephemeral
-)]
-/// Fetches system information
-pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<(), BotError> {
+/// 创建系统信息 Embed
+/// 可被命令和后台服务复用
+pub async fn create_system_info_embed(
+    db: &crate::database::BotDatabase,
+    cache: &serenity::cache::Cache,
+    latency: std::time::Duration,
+) -> Result<CreateEmbed, BotError> {
     use tikv_jemalloc_ctl::{epoch, stats};
-    let ephemeral = ephemeral.unwrap_or(true);
+
     let kernel_version = System::kernel_long_version();
     let os_version = System::long_os_version().unwrap_or_else(|| "Unknown".into());
     let e = epoch::mib()?;
@@ -35,17 +32,16 @@ pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<()
     let used_memory = sys.used_memory() / 1024 / 1024; // Convert to MB
     let memory_usage = (used_memory as f64 / total_memory as f64) * 100.0;
     let rust_version = compile_time::rustc_version_str!();
-    let db_size = ctx.data().db.size().await? / 1024 / 1024; // Convert to MB
-    let latency = ctx.ping().await;
+    let db_size = db.size().await? / 1024 / 1024; // Convert to MB
     let metrics = tokio::runtime::Handle::current().metrics();
     let queue_count = metrics.global_queue_depth();
     let active_count = metrics.num_alive_tasks();
     let workers = metrics.num_workers();
 
     // Get application statistics
-    let auto_publish_users = ctx.data().db.user_settings().get_auto_publish_count().await.unwrap_or(0);
-    let total_posts = ctx.data().db.published_posts().get_total_count().await.unwrap_or(0);
-    let backup_allowed_posts = ctx.data().db.published_posts().get_backup_allowed_count().await.unwrap_or(0);
+    let auto_publish_users = db.user_settings().get_auto_publish_count().await.unwrap_or(0);
+    let total_posts = db.published_posts().get_total_count().await.unwrap_or(0);
+    let backup_allowed_posts = db.published_posts().get_backup_allowed_count().await.unwrap_or(0);
 
     // Get color based on CPU usage
     let color = if cpu_usage < 50.0 {
@@ -87,12 +83,30 @@ pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<()
         .field("🚀 自动发布用户", auto_publish_users.to_string(), true)
         .field("📄 使用协议作品", total_posts.to_string(), true)
         .field("💾 授权备份作品", backup_allowed_posts.to_string(), true)
-        .thumbnail(ctx.cache().current_user().avatar_url().unwrap_or_default())
+        .thumbnail(cache.current_user().avatar_url().unwrap_or_default())
         .timestamp(chrono::Utc::now())
         .footer(CreateEmbedFooter::new("系统监控"))
         .author(CreateEmbedAuthor::from(User::from(
-            ctx.cache().current_user().clone(),
+            cache.current_user().clone(),
         )));
+
+    Ok(embed)
+}
+
+#[command(
+    slash_command,
+    owners_only,
+    global_cooldown = 10,
+    name_localized("zh-CN", "系统信息"),
+    description_localized("zh-CN", "获取系统信息，包括系统名称、内核版本和操作系统版本"),
+    ephemeral
+)]
+/// Fetches system information
+pub async fn system_info(ctx: Context<'_>, ephemeral: Option<bool>) -> Result<(), BotError> {
+    let ephemeral = ephemeral.unwrap_or(true);
+    let latency = ctx.ping().await;
+
+    let embed = create_system_info_embed(ctx.data().db(), ctx.cache(), latency).await?;
 
     ctx.send(CreateReply::default().embed(embed).ephemeral(ephemeral))
         .await?;
@@ -176,6 +190,58 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
             ctx.say(content).await?;
         }
     }
+
+    Ok(())
+}
+
+#[command(
+    slash_command,
+    owners_only,
+    name_localized("zh-CN", "设置系统状态"),
+    description_localized("zh-CN", "在当前频道设置自动更新的系统状态消息"),
+    ephemeral
+)]
+/// Setup auto-updating system status message in the current channel
+pub async fn setup_system_status(ctx: Context<'_>) -> Result<(), BotError> {
+    // 获取当前频道 ID
+    let channel_id = ctx.channel_id();
+
+    // 创建系统信息 embed
+    let latency = ctx.ping().await;
+    let embed = create_system_info_embed(ctx.data().db(), ctx.cache(), latency).await?;
+
+    // 在当前频道发送非 ephemeral 消息
+    let message = channel_id
+        .send_message(
+            &ctx.serenity_context().http,
+            serenity::all::CreateMessage::new().embed(embed),
+        )
+        .await?;
+
+    // 更新配置
+    let mut cfg = ctx.data().cfg().load().as_ref().clone();
+    cfg.status_message_channel_id = Some(channel_id);
+    cfg.status_message_id = Some(message.id);
+
+    // 写入配置文件
+    cfg.write()?;
+
+    // 更新内存中的配置
+    ctx.data().cfg().store(std::sync::Arc::new(cfg));
+
+    // 向用户发送确认消息（ephemeral）
+    ctx.send(
+        CreateReply::default()
+            .content(format!(
+                "✅ 系统状态消息已设置在 <#{}>！\n\
+                消息将每 {} 秒自动更新一次。\n\
+                重启 Bot 后会继续自动更新。",
+                channel_id,
+                ctx.data().cfg().load().status_update_interval_secs
+            ))
+            .ephemeral(true),
+    )
+    .await?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 // mod cookie;
 mod forum_management;
 mod license;
-mod system;
+pub mod system;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
@@ -93,6 +93,7 @@ fn option(_cfg: &ArcSwap<BotCfg>) -> poise::FrameworkOptions<Data, BotError> {
             create_license_interactive(),
             register(),
             system_info(),
+            setup_system_status(),
             license_manager(),
             publish_license(),
             reload_licenses(),

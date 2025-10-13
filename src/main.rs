@@ -92,12 +92,28 @@ async fn main() -> Result<(), BotError> {
         .type_map_insert::<BotDatabase>(db.to_owned())
         .type_map_insert::<BotCfg>(cfg.to_owned())
         .framework(framework(
-            db,
-            cfg,
+            db.clone(),
+            cfg.clone(),
             system_license_cache,
             notification_service,
         ))
         .await?;
+
+    // Start status monitor after client is created
+    let db_for_monitor = Arc::new(db);
+    let cfg_for_monitor = cfg;
+    let http_for_monitor = client.http.clone();
+    let cache_for_monitor = client.cache.clone();
+
+    tokio::spawn(async move {
+        dc_bot::services::status_monitor::start_status_monitor(
+            http_for_monitor,
+            db_for_monitor,
+            cfg_for_monitor,
+            cache_for_monitor,
+        )
+        .await;
+    });
 
     // Finally, start a single shard, and start listening to events.
     //
