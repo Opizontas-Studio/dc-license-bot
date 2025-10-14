@@ -2,10 +2,14 @@ use std::{sync::Arc, time::Duration};
 
 use arc_swap::ArcSwap;
 use serenity::all::{ChannelId, Http, MessageId};
-use tokio::time;
+use tokio::{sync::RwLock, task::JoinHandle, time};
 use tracing::{error, info, warn};
 
 use crate::{config::BotCfg, database::BotDatabase};
+
+/// 全局的状态监控任务 handle
+static STATUS_MONITOR_HANDLE: tokio::sync::OnceCell<RwLock<Option<JoinHandle<()>>>> =
+    tokio::sync::OnceCell::const_new();
 
 /// 启动系统状态监控后台任务
 ///
@@ -36,10 +40,38 @@ pub async fn start_status_monitor(
         channel_id, message_id, update_interval_secs
     );
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         status_monitor_task(http, db, cfg, cache, channel_id, message_id, update_interval_secs)
             .await;
     });
+
+    // 保存任务 handle
+    let handle_lock = STATUS_MONITOR_HANDLE
+        .get_or_init(|| async { RwLock::new(None) })
+        .await;
+    *handle_lock.write().await = Some(handle);
+}
+
+/// 重启系统状态监控任务
+///
+/// 会先停止旧任务（如果存在），然后启动新任务
+pub async fn restart_status_monitor(
+    http: Arc<Http>,
+    db: Arc<BotDatabase>,
+    cfg: Arc<ArcSwap<BotCfg>>,
+    cache: Arc<serenity::cache::Cache>,
+) {
+    // 停止旧任务
+    if let Some(handle_lock) = STATUS_MONITOR_HANDLE.get() {
+        let mut handle_guard = handle_lock.write().await;
+        if let Some(old_handle) = handle_guard.take() {
+            info!("停止旧的系统状态监控任务");
+            old_handle.abort();
+        }
+    }
+
+    // 启动新任务
+    start_status_monitor(http, db, cfg, cache).await;
 }
 
 /// 状态监控后台任务
@@ -52,21 +84,12 @@ async fn status_monitor_task(
     message_id: MessageId,
     update_interval_secs: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(update_interval_secs));
-
-    // 第一次立即触发会在启动时发生，我们跳过它，等待第一个实际间隔
-    interval.tick().await;
-
     loop {
-        interval.tick().await;
-
-        // 使用 ping 模拟延迟（在后台任务中我们无法直接获取 WebSocket 延迟）
-        // 这里使用一个固定值或者从其他地方获取
-        let latency = Duration::from_millis(100); // 占位值
+        // 执行状态更新
+        let latency = Duration::from_millis(100);
 
         match crate::commands::system::create_system_info_embed(&db, &cache, latency).await {
             Ok(embed) => {
-                // 编辑消息
                 if let Err(e) = http
                     .edit_message(
                         channel_id,
@@ -77,7 +100,6 @@ async fn status_monitor_task(
                     .await
                 {
                     error!("更新系统状态消息失败: {}", e);
-                    // 如果消息不存在或无法访问，可以考虑停止任务
                     if e.to_string().contains("Unknown Message") {
                         error!("状态消息不存在，停止监控任务。");
                         break;
@@ -88,5 +110,10 @@ async fn status_monitor_task(
                 error!("创建系统信息 embed 失败: {}", e);
             }
         }
+
+        // 等待下一次更新
+        time::sleep(Duration::from_secs(update_interval_secs)).await;
     }
+
+    warn!("系统状态监控任务已停止");
 }

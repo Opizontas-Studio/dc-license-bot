@@ -206,6 +206,21 @@ pub async fn setup_system_status(ctx: Context<'_>) -> Result<(), BotError> {
     // 获取当前频道 ID
     let channel_id = ctx.channel_id();
 
+    // 检查是否已有旧的状态消息，如果有则删除
+    let current_cfg = ctx.data().cfg().load();
+    if let (Some(old_channel_id), Some(old_message_id)) = (
+        current_cfg.status_message_channel_id,
+        current_cfg.status_message_id,
+    ) {
+        // 尝试删除旧消息（忽略错误，可能消息已被手动删除）
+        let _ = ctx
+            .serenity_context()
+            .http
+            .delete_message(old_channel_id, old_message_id, None)
+            .await;
+    }
+    drop(current_cfg); // 释放引用
+
     // 创建系统信息 embed
     let latency = ctx.ping().await;
     let embed = create_system_info_embed(ctx.data().db(), ctx.cache(), latency).await?;
@@ -229,13 +244,22 @@ pub async fn setup_system_status(ctx: Context<'_>) -> Result<(), BotError> {
     // 更新内存中的配置
     ctx.data().cfg().store(std::sync::Arc::new(cfg));
 
+    // 重启状态监控任务，使用新的配置
+    crate::services::status_monitor::restart_status_monitor(
+        ctx.serenity_context().http.clone(),
+        std::sync::Arc::new(ctx.data().db().clone()),
+        ctx.data().cfg().clone(),
+        ctx.serenity_context().cache.clone(),
+    )
+    .await;
+
     // 向用户发送确认消息（ephemeral）
     ctx.send(
         CreateReply::default()
             .content(format!(
                 "✅ 系统状态消息已设置在 <#{}>！\n\
                 消息将每 {} 秒自动更新一次。\n\
-                重启 Bot 后会继续自动更新。",
+                监控任务已重启。",
                 channel_id,
                 ctx.data().cfg().load().status_update_interval_secs
             ))
