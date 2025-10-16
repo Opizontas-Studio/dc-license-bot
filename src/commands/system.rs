@@ -17,7 +17,6 @@ pub async fn create_system_info_embed(
     latency: std::time::Duration,
 ) -> Result<CreateEmbed, BotError> {
     use tikv_jemalloc_ctl::{epoch, stats};
-
     let kernel_version = System::kernel_long_version();
     let os_version = System::long_os_version().unwrap_or_else(|| "Unknown".into());
     let e = epoch::mib()?;
@@ -95,6 +94,7 @@ pub async fn create_system_info_embed(
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     owners_only,
     global_cooldown = 10,
     name_localized("zh-CN", "系统信息"),
@@ -164,6 +164,7 @@ pub async fn guilds_info(ctx: Context<'_>) -> Result<(), BotError> {
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     check = "check_admin",
     ephemeral,
     name_localized("zh-CN", "重载系统授权"),
@@ -196,6 +197,7 @@ pub async fn reload_licenses(ctx: Context<'_>) -> Result<(), BotError> {
 
 #[command(
     slash_command,
+    default_member_permissions = "ADMINISTRATOR",
     owners_only,
     name_localized("zh-CN", "设置系统状态"),
     description_localized("zh-CN", "在当前频道设置自动更新的系统状态消息"),
