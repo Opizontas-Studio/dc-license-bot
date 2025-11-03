@@ -265,13 +265,12 @@ pub async fn license_manager(ctx: Context<'_>) -> Result<(), BotError> {
             // Delete license without confirmation
             db.license().delete(license_id, ctx.author().id).await?;
 
-            if let Some(settings) = db.user_settings().get(ctx.author().id).await? {
-                if settings.default_user_license_id == Some(license_id) {
+            if let Some(settings) = db.user_settings().get(ctx.author().id).await?
+                && settings.default_user_license_id == Some(license_id) {
                     db.user_settings()
                         .set_default_license(ctx.author().id, None, None)
                         .await?;
                 }
-            }
 
             // Update message to show deletion success
             reply

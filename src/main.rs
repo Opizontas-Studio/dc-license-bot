@@ -84,9 +84,9 @@ async fn main() -> Result<(), BotError> {
         .cache_settings({
             let mut s = serenity::cache::Settings::default();
             s.max_messages = 0; // Set the maximum number of messages to cache
-            s.cache_channels = false; // Disable channel caching
-            s.cache_guilds = false; // Disable guild caching
-            s.cache_users = false; // Disable user caching
+            s.cache_channels = true;
+            s.cache_guilds = true;
+            s.cache_users = true;
             s
         })
         .type_map_insert::<BotDatabase>(db.to_owned())

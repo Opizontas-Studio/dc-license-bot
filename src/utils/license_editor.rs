@@ -297,8 +297,8 @@ impl<'a> LicenseEditor<'a> {
         match interaction.delete_response(&self.serenity_ctx.http).await {
             Ok(()) => Ok(()),
             Err(err) => {
-                if let serenity::Error::Http(http_err) = &err {
-                    if let serenity::http::HttpError::UnsuccessfulRequest(resp) = http_err {
+                if let serenity::Error::Http(http_err) = &err
+                    && let serenity::http::HttpError::UnsuccessfulRequest(resp) = http_err {
                         let code = resp.error.code;
                         if code == 10062 || code == 10008 {
                             debug!(
@@ -308,7 +308,6 @@ impl<'a> LicenseEditor<'a> {
                             return Ok(());
                         }
                     }
-                }
 
                 Err(err.into())
             }
