@@ -28,3 +28,9 @@ gateway_api_key = "your-gateway-api-key-here" # API 密钥
 # 2. 域名/IP: "grpc.example.com" (自动使用 HTTPS) 或 "localhost:50051" (自动使用 HTTP)
 # 3. Cloudflare Tunnel: "your-tunnel.trycloudflare.com" (自动使用 HTTPS)
 gateway_address = "grpc.example.com:443"
+
+# System status monitor configuration
+# 系统状态监控配置（由 /setup_system_status 命令自动设置）
+# status_message_channel_id = 1234567890123456789  # 状态消息所在频道ID
+# status_message_id = 9876543210987654321          # 状态消息ID
+status_update_interval_secs = 60                   # 状态更新间隔（秒）

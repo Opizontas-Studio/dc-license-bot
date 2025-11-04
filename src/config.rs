@@ -15,7 +15,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serenity::{
-    all::{ChannelId, RoleId, UserId},
+    all::{ChannelId, MessageId, RoleId, UserId},
     prelude::TypeMapKey,
 };
 use snafu::ResultExt;
@@ -37,10 +37,19 @@ pub struct BotCfg {
     pub gateway_enabled: Option<bool>,
     pub gateway_address: Option<String>,
     pub gateway_api_key: Option<String>,
+    // 系统状态监控配置
+    pub status_message_channel_id: Option<ChannelId>,
+    pub status_message_id: Option<MessageId>,
+    #[serde(default = "default_status_update_interval")]
+    pub status_update_interval_secs: u64,
     #[serde(skip)]
     pub path: PathBuf,
     #[serde(skip)]
     pub bot_start_time: DateTime<Utc>,
+}
+
+fn default_status_update_interval() -> u64 {
+    60 // 默认60秒更新一次
 }
 
 impl TypeMapKey for BotCfg {
