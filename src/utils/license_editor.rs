@@ -17,14 +17,23 @@ const INTERACTION_TIMEOUT_SECS: u64 = 600;
 /// - `initial_state`: 初始编辑状态
 ///
 /// # 返回值
-/// - `Some(LicenseEditState)`: 用户保存的最终状态
-/// - `None`: 用户取消了编辑
+/// 结果类型，包含最终状态与可复用的交互
+#[derive(Debug, Clone)]
+pub struct LicenseEditorOutcome {
+    /// 用户最终保存的状态；为 `None` 表示取消或超时
+    pub state: Option<LicenseEditState>,
+    /// 最近一次组件交互，用于后续 follow-up 消息
+    pub interaction: Option<ComponentInteraction>,
+}
+
+/// - `state: Some(LicenseEditState)`: 用户保存的最终状态
+/// - `state: None`: 用户取消了编辑或超时
 pub async fn present_license_editing_panel(
     serenity_ctx: &serenity::all::Context,
     data: &Data,
     interaction: &ComponentInteraction,
     initial_state: LicenseEditState,
-) -> Result<Option<LicenseEditState>, BotError> {
+) -> Result<LicenseEditorOutcome, BotError> {
     // 创建编辑器状态
     let mut editor_state = LicenseEditor::new(serenity_ctx, data, initial_state);
 
@@ -48,7 +57,10 @@ pub async fn present_license_editing_panel(
                 else {
                     // 超时，清理UI
                     editor_state.cleanup_ui(interaction).await?;
-                    return Ok(None);
+                    return Ok(LicenseEditorOutcome {
+                        state: None,
+                        interaction: None,
+                    });
                 };
 
                 // 处理按钮交互
@@ -58,10 +70,16 @@ pub async fn present_license_editing_panel(
                     // 检查是否是保存操作
                     if edit_interaction.data.custom_id == "save_license" {
                         editor_state.cleanup_ui(&edit_interaction).await?;
-                        return Ok(Some(editor_state.get_state().clone()));
+                        return Ok(LicenseEditorOutcome {
+                            state: Some(editor_state.get_state().clone()),
+                            interaction: Some(edit_interaction.clone()),
+                        });
                     } else {
                         editor_state.cleanup_ui(&edit_interaction).await?;
-                        return Ok(None);
+                        return Ok(LicenseEditorOutcome {
+                            state: None,
+                            interaction: Some(edit_interaction.clone()),
+                        });
                     }
                 } else {
                     // 更新UI显示（如果不是Modal操作）
@@ -108,10 +126,16 @@ pub async fn present_license_editing_panel(
                             if should_exit {
                                 if edit_interaction.data.custom_id == "save_license" {
                                     editor_state.cleanup_ui(&edit_interaction).await?;
-                                    return Ok(Some(editor_state.get_state().clone()));
+                                    return Ok(LicenseEditorOutcome {
+                                        state: Some(editor_state.get_state().clone()),
+                                        interaction: Some(edit_interaction.clone()),
+                                    });
                                 } else {
                                     editor_state.cleanup_ui(&edit_interaction).await?;
-                                    return Ok(None);
+                                    return Ok(LicenseEditorOutcome {
+                                        state: None,
+                                        interaction: Some(edit_interaction.clone()),
+                                    });
                                 }
                             } else {
                                 // 更新UI显示（如果不是Modal操作）
@@ -122,7 +146,10 @@ pub async fn present_license_editing_panel(
                         } else {
                             // 超时，清理UI
                             editor_state.cleanup_ui(interaction).await?;
-                            return Ok(None);
+                            return Ok(LicenseEditorOutcome {
+                                state: None,
+                                interaction: None,
+                            });
                         }
                     }
                 }

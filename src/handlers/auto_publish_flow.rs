@@ -612,27 +612,41 @@ impl<'a> AutoPublishFlow<'a> {
 
         // 调用协议编辑面板
         match present_license_editing_panel(self.ctx, self.data, &interaction, edit_state).await {
-            Ok(Some(final_state)) => {
-                // 用户保存了协议，保存编辑器交互用于后续followup
-                self.editor_interaction = Some(interaction.clone());
-                match self.save_license_and_set_default(final_state).await {
-                    Ok(license) => {
-                        self.transition_to(FlowState::ConfirmingSave(license));
-                    }
-                    Err(e) => {
-                        tracing::error!("保存协议失败: {}", e);
-                        // 发送错误消息
-                        self.followup_with_error(&interaction, "协议保存失败，请稍后重试。")
-                            .await?;
+            Ok(outcome) => {
+                if let Some(final_state) = outcome.state {
+                    let Some(latest_interaction) = outcome.interaction else {
+                        tracing::warn!("协议编辑完成但缺少有效的交互令牌，终止后续流程");
                         self.transition_to(FlowState::Done);
+                        return Ok(());
+                    };
+
+                    // 保存最新交互用于后续followup
+                    self.editor_interaction = Some(latest_interaction.clone());
+
+                    match self.save_license_and_set_default(final_state).await {
+                        Ok(license) => {
+                            self.transition_to(FlowState::ConfirmingSave(license));
+                        }
+                        Err(e) => {
+                            tracing::error!("保存协议失败: {}", e);
+                            // 发送错误消息
+                            self.followup_with_error(
+                                &latest_interaction,
+                                "协议保存失败，请稍后重试。",
+                            )
+                            .await?;
+                            self.transition_to(FlowState::Done);
+                        }
                     }
+                } else if let Some(latest_interaction) = outcome.interaction {
+                    // 用户取消了编辑，转到重新选择状态
+                    let system_licenses = self.system_licenses.clone().unwrap_or_default();
+                    self.editor_interaction = Some(latest_interaction);
+                    self.transition_to(FlowState::AwaitingLicenseReselection(system_licenses));
+                } else {
+                    // 没有新的交互（例如超时），结束流程
+                    self.transition_to(FlowState::Done);
                 }
-            }
-            Ok(None) => {
-                // 用户取消了编辑，转到重新选择状态
-                let system_licenses = self.system_licenses.clone().unwrap_or_default();
-                self.editor_interaction = Some(interaction.clone());
-                self.transition_to(FlowState::AwaitingLicenseReselection(system_licenses));
             }
             Err(e) => {
                 tracing::error!("协议编辑流程失败: {}", e);
